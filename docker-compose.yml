@@ -28,18 +28,17 @@ services:
       - SPRING_DATASOURCE_PASSWORD=admin
       - SPRING_JPA_HIBERNATE_DDL_AUTO=update
       - SPRING_JPA_SHOW_SQL=true
-      - SPRING_DEVTOOLS_REMOTE_SECRET=mysecret
     volumes:
       - ./StudentTracker/src:/app/src
-      - ./StudentTracker/build:/app/build
       - ~/.gradle:/home/gradle/.gradle
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
     restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
     environment:
