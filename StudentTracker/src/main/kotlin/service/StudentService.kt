@@ -18,7 +18,7 @@ class StudentService(
 ) {
 
     @Transactional
-    fun processExcelFile(file: MultipartFile): List<Student> {
+    fun processStudentsExcelFile(file: MultipartFile): List<Student> {
         val students = mutableListOf<Student>()
         val groupStreamCache = mutableMapOf<String, GroupStream>()
 

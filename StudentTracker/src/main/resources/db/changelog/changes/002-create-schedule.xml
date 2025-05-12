@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <changeSet id="2" author="alexey_pritula">
+
+        <createTable tableName="schedule">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="start_time" type="time">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="day_of_week" type="text">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="group_name" type="text">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="teacher" type="text">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="subject" type="text">
+                <constraints nullable="false"/>
+            </column>
+
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="schedule"
+                baseColumnNames="group_name"
+                constraintName="fk_schedule_group"
+                referencedTableName="group_streams"
+                referencedColumnNames="group_name"
+                onDelete="CASCADE"/>
+
+    </changeSet>
+</databaseChangeLog>

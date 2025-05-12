@@ -1,19 +1,19 @@
 package org.example.controller
 
-import org.springframework.web.bind.annotation.*
-import org.springframework.web.multipart.MultipartFile
-import org.apache.poi.xssf.usermodel.XSSFWorkbook
-import org.example.service.ExcelProcessingException
+import org.example.service.ScheduleService
 import org.example.service.StudentService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import java.io.ByteArrayInputStream
+import org.springframework.web.bind.annotation.*
+import org.springframework.web.multipart.MultipartFile
 
 @RestController
 @RequestMapping("/api")
 class GenerateController(
-    private val studentService: StudentService
+    private val studentService: StudentService,
+    private val scheduleService: ScheduleService
 ) {
+
     @PostMapping("/generateTables", consumes = ["multipart/form-data"])
     fun generateTables(
         @RequestParam("jsonFile") scheduleJsonFile: MultipartFile,
@@ -21,23 +21,21 @@ class GenerateController(
     ): ResponseEntity<String> {
 
         return try {
-            val jsonContent = String(scheduleJsonFile.bytes)
-
-            val excelData = studentService.processExcelFile(studentsExcelFile)
+            val students = studentService.processStudentsExcelFile(studentsExcelFile)
+            val schedules = scheduleService.processScheduleJsonFile(scheduleJsonFile)
 
             val result = """
-            Успешно обработано:
-            JSON: ${scheduleJsonFile.originalFilename}
-            Excel: ${studentsExcelFile.originalFilename}
-            Количество добавленных студентов: ${excelData.size}
-        """
+                Успешно обработано:
+                JSON: ${scheduleJsonFile.originalFilename} (${schedules.size} записей)
+                Excel: ${studentsExcelFile.originalFilename} (${students.size} студентов)
+            """.trimIndent()
 
             ResponseEntity.ok(result)
 
-        } catch (e: ExcelProcessingException) {
+        } catch (e: Exception) {
             ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body("Ошибка обработки Excel: ${e.message}")
+                .body("Ошибка обработки файлов: ${e.message}")
         }
-    }
 
+    }
 }
