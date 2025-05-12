@@ -3,38 +3,41 @@ package org.example.controller
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
+import org.example.service.ExcelProcessingException
+import org.example.service.StudentService
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import java.io.ByteArrayInputStream
 
 @RestController
 @RequestMapping("/api")
-class GenerateController {
-
+class GenerateController(
+    private val studentService: StudentService
+) {
     @PostMapping("/generateTables", consumes = ["multipart/form-data"])
     fun generateTables(
-        @RequestParam("jsonFile") jsonFile: MultipartFile,
-        @RequestParam("xlsxFile") xlsxFile: MultipartFile
-    ): String {
-        // Обработка JSON
-        val jsonContent = String(jsonFile.bytes)
+        @RequestParam("jsonFile") scheduleJsonFile: MultipartFile,
+        @RequestParam("xlsxFile") studentsExcelFile: MultipartFile
+    ): ResponseEntity<String> {
 
-        // Обработка XLSX
-        val workbook = XSSFWorkbook(ByteArrayInputStream(xlsxFile.bytes))
-        val sheet = workbook.getSheetAt(0)
+        return try {
+            val jsonContent = String(scheduleJsonFile.bytes)
 
-        val excelData = StringBuilder()
-        for (row in sheet) {
-            for (cell in row) {
-                excelData.append(cell.toString()).append("\t")
-            }
-            excelData.append("\n")
-        }
+            val excelData = studentService.processExcelFile(studentsExcelFile)
 
-        return """
+            val result = """
             Успешно обработано:
-            JSON файл: ${jsonFile.originalFilename} (${jsonContent.length} символов)
-            Excel файл: ${xlsxFile.originalFilename}
-            Первые 5 строк данных:
-            ${excelData.toString().lines().take(5).joinToString("\n")}
-        """.trimIndent()
+            JSON: ${scheduleJsonFile.originalFilename}
+            Excel: ${studentsExcelFile.originalFilename}
+            Количество добавленных студентов: ${excelData.size}
+        """
+
+            ResponseEntity.ok(result)
+
+        } catch (e: ExcelProcessingException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body("Ошибка обработки Excel: ${e.message}")
+        }
     }
+
 }
