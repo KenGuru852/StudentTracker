@@ -14,7 +14,7 @@ class AttendanceSheetService {
     companion object {
         private const val CREDENTIALS_PATH = "src/main/resources/credentials.json"
         private const val APPLICATION_NAME = "Student Attendance Tracker"
-        private const val LESSONS_COUNT = 17 // Количество занятий
+        private const val LESSONS_COUNT = 17
     }
 
     private val sheetsService: Sheets by lazy {
@@ -46,14 +46,12 @@ class AttendanceSheetService {
     fun createAttendanceSheet(studentNames: List<String>): String {
         require(studentNames.isNotEmpty()) { "Student list cannot be empty" }
 
-        // 1. Create new spreadsheet
         val spreadsheet = Spreadsheet()
             .setProperties(SpreadsheetProperties().setTitle("Student Attendance - ${java.time.LocalDate.now()}"))
 
         val createdSpreadsheet = sheetsService.spreadsheets().create(spreadsheet).execute()
         val spreadsheetId = createdSpreadsheet.spreadsheetId
 
-        // 2. Set sharing permissions
         val permission = Permission()
             .setType("anyone")
             .setRole("writer")
@@ -61,37 +59,26 @@ class AttendanceSheetService {
 
         driveService.permissions().create(spreadsheetId, permission).execute()
 
-        // 3. Prepare batch update requests
         val requests = mutableListOf<Request>()
 
-        // 3.1. Set default formatting
         requests.add(createDefaultFormatRequest())
 
-        // 3.2. Fill headers
         requests.add(createHeaderRequest())
 
-        // 3.3. Fill student names
         requests.add(createStudentNamesRequest(studentNames))
 
-        // 3.4. Set borders
         requests.add(createBordersRequest(studentNames.size))
 
-        // 3.5. Attendance percentage formulas
         requests.add(createAttendancePercentageRequest(studentNames.size))
 
-        // 3.6. Attendance count formulas
         requests.add(createAttendanceCountRequest(studentNames.size))
 
-        // 3.7. Lesson summary formulas
         requests.add(createLessonSummaryRequest(studentNames.size))
 
-        // 3.8. Additional formatting
         requests.addAll(createFormattingRequests(studentNames.size))
 
-        // 3.9. Column sizing
         requests.addAll(createColumnSizingRequests())
 
-        // 4. Execute all requests
         val batchUpdateRequest = BatchUpdateSpreadsheetRequest().setRequests(requests)
         sheetsService.spreadsheets().batchUpdate(spreadsheetId, batchUpdateRequest).execute()
 
@@ -185,9 +172,9 @@ class AttendanceSheetService {
                     GridRange()
                         .setSheetId(0)
                         .setStartRowIndex(0)
-                        .setEndRowIndex(studentCount + 2) // +2 for header and summary
+                        .setEndRowIndex(studentCount + 2)
                         .setStartColumnIndex(0)
-                        .setEndColumnIndex(LESSONS_COUNT + 3) // +3 for name, %, and count columns
+                        .setEndColumnIndex(LESSONS_COUNT + 3)
                 )
                 .setTop(Border().setStyle("SOLID").setColor(Color().setRed(0f).setGreen(0f).setBlue(0f)))
                 .setBottom(Border().setStyle("SOLID").setColor(Color().setRed(0f).setGreen(0f).setBlue(0f)))
@@ -276,8 +263,8 @@ class AttendanceSheetService {
                                         )
                                     )
                                 }.toTypedArray(),
-                                CellData(), // Empty for % column
-                                CellData()  // Empty for count column
+                                CellData(),
+                                CellData()
                             )
                         )
                     )
@@ -288,7 +275,6 @@ class AttendanceSheetService {
 
     private fun createFormattingRequests(studentCount: Int): List<Request> {
         return listOf(
-            // First column left-aligned
             Request().setRepeatCell(
                 RepeatCellRequest()
                     .setRange(
@@ -309,7 +295,6 @@ class AttendanceSheetService {
                     .setFields("userEnteredFormat.horizontalAlignment")
             ),
 
-            // Header row centered
             Request().setRepeatCell(
                 RepeatCellRequest()
                     .setRange(
@@ -330,7 +315,6 @@ class AttendanceSheetService {
                     .setFields("userEnteredFormat.horizontalAlignment")
             ),
 
-            // Summary row bold
             Request().setRepeatCell(
                 RepeatCellRequest()
                     .setRange(
@@ -355,7 +339,6 @@ class AttendanceSheetService {
 
     private fun createColumnSizingRequests(): List<Request> {
         return listOf(
-            // Auto-resize first column (A)
             Request().setAutoResizeDimensions(
                 AutoResizeDimensionsRequest()
                     .setDimensions(
@@ -367,7 +350,6 @@ class AttendanceSheetService {
                     )
             ),
 
-            // Set fixed width (100px) for all other columns (B-T)
             Request().setUpdateDimensionProperties(
                 UpdateDimensionPropertiesRequest()
                     .setRange(
