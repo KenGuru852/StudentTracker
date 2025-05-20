@@ -14,6 +14,7 @@ class AttendanceSheetService {
     companion object {
         private const val CREDENTIALS_PATH = "src/main/resources/credentials.json"
         private const val APPLICATION_NAME = "Student Attendance Tracker"
+        private const val LESSONS_COUNT = 17 // Количество занятий
     }
 
     private val sheetsService: Sheets by lazy {
@@ -43,52 +44,61 @@ class AttendanceSheetService {
     }
 
     fun createAttendanceSheet(studentNames: List<String>): String {
-        require(studentNames.size <= 30) { "Maximum 30 students allowed" }
+        require(studentNames.isNotEmpty()) { "Student list cannot be empty" }
 
-        // 1. Создаем новую таблицу
+        // 1. Create new spreadsheet
         val spreadsheet = Spreadsheet()
             .setProperties(SpreadsheetProperties().setTitle("Student Attendance - ${java.time.LocalDate.now()}"))
 
         val createdSpreadsheet = sheetsService.spreadsheets().create(spreadsheet).execute()
         val spreadsheetId = createdSpreadsheet.spreadsheetId
 
-        // 2. Настраиваем общий доступ (доступ для всех с ссылкой)
+        // 2. Set sharing permissions
         val permission = Permission()
             .setType("anyone")
-            .setRole("writer") // "reader" если нужно только чтение
+            .setRole("writer")
             .setAllowFileDiscovery(false)
 
         driveService.permissions().create(spreadsheetId, permission).execute()
 
-        // 3. Подготовка запросов для batchUpdate
+        // 3. Prepare batch update requests
         val requests = mutableListOf<Request>()
 
-        // 3.1. Установка шрифта Tahoma 18 для всей таблицы
-        requests.add(createFontRequest())
+        // 3.1. Set default formatting
+        requests.add(createDefaultFormatRequest())
 
-        // 3.2. Заполнение заголовков (C6-U6)
+        // 3.2. Fill headers
         requests.add(createHeaderRequest())
 
-        // 3.3. Заполнение ФИО студентов (C7-C36)
+        // 3.3. Fill student names
         requests.add(createStudentNamesRequest(studentNames))
 
-        // 3.4. Установка границ
-        requests.add(createBordersRequest())
+        // 3.4. Set borders
+        requests.add(createBordersRequest(studentNames.size))
 
-        // 3.5. Формулы для процента посещаемости
+        // 3.5. Attendance percentage formulas
         requests.add(createAttendancePercentageRequest(studentNames.size))
 
-        // 3.6. Форматирование
-        requests.addAll(createFormattingRequests())
+        // 3.6. Attendance count formulas
+        requests.add(createAttendanceCountRequest(studentNames.size))
 
-        // 4. Выполняем все запросы
+        // 3.7. Lesson summary formulas
+        requests.add(createLessonSummaryRequest(studentNames.size))
+
+        // 3.8. Additional formatting
+        requests.addAll(createFormattingRequests(studentNames.size))
+
+        // 3.9. Column sizing
+        requests.addAll(createColumnSizingRequests())
+
+        // 4. Execute all requests
         val batchUpdateRequest = BatchUpdateSpreadsheetRequest().setRequests(requests)
         sheetsService.spreadsheets().batchUpdate(spreadsheetId, batchUpdateRequest).execute()
 
         return "https://docs.google.com/spreadsheets/d/$spreadsheetId"
     }
 
-    private fun createFontRequest(): Request {
+    private fun createDefaultFormatRequest(): Request {
         return Request().setRepeatCell(
             RepeatCellRequest()
                 .setRange(
@@ -108,15 +118,16 @@ class AttendanceSheetService {
                                         .setFontFamily("Tahoma")
                                         .setFontSize(18)
                                 )
+                                .setHorizontalAlignment("CENTER")
                         )
                 )
-                .setFields("userEnteredFormat.textFormat.fontFamily,userEnteredFormat.textFormat.fontSize")
+                .setFields("userEnteredFormat.textFormat.fontFamily,userEnteredFormat.textFormat.fontSize,userEnteredFormat.horizontalAlignment")
         )
     }
 
     private fun createHeaderRequest(): Request {
         val headerValues = listOf(
-            listOf("", *(1..17).map { it.toString() }.toTypedArray(), "")
+            listOf("Неделя/Студент", *(1..LESSONS_COUNT).map { "$it" }.toTypedArray(), "%", "кол-во")
         )
 
         return Request().setUpdateCells(
@@ -124,8 +135,8 @@ class AttendanceSheetService {
                 .setStart(
                     GridCoordinate()
                         .setSheetId(0)
-                        .setRowIndex(5) // 6-я строка (0-based)
-                        .setColumnIndex(2) // C столбец (0-based)
+                        .setRowIndex(0)
+                        .setColumnIndex(0)
                 )
                 .setRows(listOf(
                     RowData().setValues(
@@ -134,10 +145,7 @@ class AttendanceSheetService {
                                 .setUserEnteredValue(ExtendedValue().setStringValue(value))
                                 .setUserEnteredFormat(
                                     CellFormat()
-                                        .setTextFormat(
-                                            TextFormat()
-                                                .setBold(true)
-                                        )
+                                        .setTextFormat(TextFormat().setBold(true))
                                 )
                         }
                     )
@@ -152,8 +160,8 @@ class AttendanceSheetService {
                 .setStart(
                     GridCoordinate()
                         .setSheetId(0)
-                        .setRowIndex(6) // 7-я строка
-                        .setColumnIndex(2) // C столбец
+                        .setRowIndex(1)
+                        .setColumnIndex(0)
                 )
                 .setRows(
                     studentNames.map { name ->
@@ -170,16 +178,16 @@ class AttendanceSheetService {
         )
     }
 
-    private fun createBordersRequest(): Request {
+    private fun createBordersRequest(studentCount: Int): Request {
         return Request().setUpdateBorders(
             UpdateBordersRequest()
                 .setRange(
                     GridRange()
                         .setSheetId(0)
-                        .setStartRowIndex(5) // 6-я строка
-                        .setEndRowIndex(36) // 36-я строка
-                        .setStartColumnIndex(2) // C столбец
-                        .setEndColumnIndex(21) // U столбец
+                        .setStartRowIndex(0)
+                        .setEndRowIndex(studentCount + 2) // +2 for header and summary
+                        .setStartColumnIndex(0)
+                        .setEndColumnIndex(LESSONS_COUNT + 3) // +3 for name, %, and count columns
                 )
                 .setTop(Border().setStyle("SOLID").setColor(Color().setRed(0f).setGreen(0f).setBlue(0f)))
                 .setBottom(Border().setStyle("SOLID").setColor(Color().setRed(0f).setGreen(0f).setBlue(0f)))
@@ -196,17 +204,17 @@ class AttendanceSheetService {
                 .setStart(
                     GridCoordinate()
                         .setSheetId(0)
-                        .setRowIndex(6) // 7-я строка
-                        .setColumnIndex(20) // U столбец
+                        .setRowIndex(1)
+                        .setColumnIndex(LESSONS_COUNT + 1)
                 )
                 .setRows(
-                    (7..6 + studentCount).map { row ->
-                        val range = "D$row:T$row"
+                    (2..studentCount + 1).map { row ->
+                        val range = "B$row:${('A' + LESSONS_COUNT).toChar()}$row"
                         RowData().setValues(
                             listOf(
                                 CellData().setUserEnteredValue(
                                     ExtendedValue().setFormulaValue(
-                                        "=ROUND(100*(COUNTIF($range,1)/17), 1) & \"%\""
+                                        "=ROUND(100*(COUNTIF($range,1)/$LESSONS_COUNT), 1) & \"%\""
                                     )
                                 )
                             )
@@ -217,42 +225,100 @@ class AttendanceSheetService {
         )
     }
 
-    private fun createFormattingRequests(): List<Request> {
+    private fun createAttendanceCountRequest(studentCount: Int): Request {
+        return Request().setUpdateCells(
+            UpdateCellsRequest()
+                .setStart(
+                    GridCoordinate()
+                        .setSheetId(0)
+                        .setRowIndex(1)
+                        .setColumnIndex(LESSONS_COUNT + 2)
+                )
+                .setRows(
+                    (2..studentCount + 1).map { row ->
+                        val range = "B$row:${('A' + LESSONS_COUNT).toChar()}$row"
+                        RowData().setValues(
+                            listOf(
+                                CellData().setUserEnteredValue(
+                                    ExtendedValue().setFormulaValue(
+                                        "=COUNTIF($range,1)"
+                                    )
+                                )
+                            )
+                        )
+                    }
+                )
+                .setFields("userEnteredValue")
+        )
+    }
+
+    private fun createLessonSummaryRequest(studentCount: Int): Request {
+        return Request().setUpdateCells(
+            UpdateCellsRequest()
+                .setStart(
+                    GridCoordinate()
+                        .setSheetId(0)
+                        .setRowIndex(studentCount + 1)
+                        .setColumnIndex(0)
+                )
+                .setRows(
+                    listOf(
+                        RowData().setValues(
+                            listOf(
+                                CellData().setUserEnteredValue(
+                                    ExtendedValue().setStringValue("Итого на паре:")
+                                ),
+                                *(1..LESSONS_COUNT).map { lessonCol ->
+                                    val colLetter = ('A' + lessonCol).toChar()
+                                    CellData().setUserEnteredValue(
+                                        ExtendedValue().setFormulaValue(
+                                            "=COUNTIF(${colLetter}2:${colLetter}${studentCount + 1},1)"
+                                        )
+                                    )
+                                }.toTypedArray(),
+                                CellData(), // Empty for % column
+                                CellData()  // Empty for count column
+                            )
+                        )
+                    )
+                )
+                .setFields("userEnteredValue")
+        )
+    }
+
+    private fun createFormattingRequests(studentCount: Int): List<Request> {
         return listOf(
-            // Форматирование заголовков
+            // First column left-aligned
             Request().setRepeatCell(
                 RepeatCellRequest()
                     .setRange(
                         GridRange()
                             .setSheetId(0)
-                            .setStartRowIndex(5)
-                            .setEndRowIndex(6)
-                            .setStartColumnIndex(2)
-                            .setEndColumnIndex(21)
+                            .setStartRowIndex(1)
+                            .setEndRowIndex(studentCount + 1)
+                            .setStartColumnIndex(0)
+                            .setEndColumnIndex(1)
                     )
                     .setCell(
                         CellData()
                             .setUserEnteredFormat(
                                 CellFormat()
-                                    .setTextFormat(
-                                        TextFormat()
-                                            .setBold(true)
-                                    )
-                                    .setHorizontalAlignment("CENTER")
+                                    .setHorizontalAlignment("LEFT")
                             )
                     )
-                    .setFields("userEnteredFormat.textFormat.bold,userEnteredFormat.horizontalAlignment")
+                    .setFields("userEnteredFormat.horizontalAlignment")
             ),
-            // Форматирование процентов посещаемости
+
+            // Header row centered
             Request().setRepeatCell(
                 RepeatCellRequest()
                     .setRange(
                         GridRange()
                             .setSheetId(0)
-                            .setStartRowIndex(6)
-                            .setEndRowIndex(36)
-                            .setStartColumnIndex(20)
-                            .setEndColumnIndex(21)
+                            .setStartRowIndex(0)
+                            .setEndRowIndex(1)
+                            .setStartColumnIndex(0)
+                            .setEndColumnIndex(LESSONS_COUNT + 3)
                     )
                     .setCell(
                         CellData()
@@ -262,6 +328,60 @@ class AttendanceSheetService {
                             )
                     )
                     .setFields("userEnteredFormat.horizontalAlignment")
+            ),
+
+            // Summary row bold
+            Request().setRepeatCell(
+                RepeatCellRequest()
+                    .setRange(
+                        GridRange()
+                            .setSheetId(0)
+                            .setStartRowIndex(studentCount + 1)
+                            .setEndRowIndex(studentCount + 2)
+                            .setStartColumnIndex(0)
+                            .setEndColumnIndex(LESSONS_COUNT + 3)
+                    )
+                    .setCell(
+                        CellData()
+                            .setUserEnteredFormat(
+                                CellFormat()
+                                    .setTextFormat(TextFormat().setBold(true))
+                            )
+                    )
+                    .setFields("userEnteredFormat.textFormat.bold")
+            )
+        )
+    }
+
+    private fun createColumnSizingRequests(): List<Request> {
+        return listOf(
+            // Auto-resize first column (A)
+            Request().setAutoResizeDimensions(
+                AutoResizeDimensionsRequest()
+                    .setDimensions(
+                        DimensionRange()
+                            .setSheetId(0)
+                            .setDimension("COLUMNS")
+                            .setStartIndex(0)
+                            .setEndIndex(1)
+                    )
+            ),
+
+            // Set fixed width (100px) for all other columns (B-T)
+            Request().setUpdateDimensionProperties(
+                UpdateDimensionPropertiesRequest()
+                    .setRange(
+                        DimensionRange()
+                            .setSheetId(0)
+                            .setDimension("COLUMNS")
+                            .setStartIndex(1)
+                            .setEndIndex(LESSONS_COUNT + 3)
+                    )
+                    .setProperties(
+                        DimensionProperties()
+                            .setPixelSize(100)
+                    )
+                    .setFields("pixelSize")
             )
         )
     }
