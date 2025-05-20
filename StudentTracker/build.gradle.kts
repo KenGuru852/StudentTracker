@@ -23,6 +23,14 @@ dependencies {
     runtimeOnly("org.postgresql:postgresql")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     testImplementation(kotlin("test"))
+
+    implementation("com.google.apis:google-api-services-sheets:v4-rev20250509-2.0.0")
+
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.15.0")
+
+    implementation("com.google.api-client:google-api-client:2.7.2")
+
+    implementation("com.google.apis:google-api-services-drive:v3-rev20250511-2.0.0")
 }
 
 tasks.test {
