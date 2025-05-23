@@ -6,4 +6,5 @@ import org.springframework.stereotype.Repository
 
 @Repository
 interface StudentRepository : JpaRepository<Student, Long> {
+    fun findByGroupStreamGroupName(groupName: String): List<Student>
 }

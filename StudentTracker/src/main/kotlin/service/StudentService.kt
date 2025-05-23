@@ -45,7 +45,7 @@ class StudentService(
         for (sheetIndex in 0 until workbook.numberOfSheets) {
             val sheet = workbook.getSheetAt(sheetIndex)
 
-            for (rowIndex in 0..sheet.lastRowNum) {
+            for (rowIndex in 1..sheet.lastRowNum) {
                 val row: Row = sheet.getRow(rowIndex) ?: continue
                 processStudentRow(row, groupStreamCache, students)
             }
@@ -57,12 +57,12 @@ class StudentService(
         groupStreamCache: MutableMap<String, GroupStream>,
         students: MutableList<Student>
     ) {
-        val surname = row.getCell(0)?.toString()?.trim() ?: return
-        val name = row.getCell(1)?.toString()?.trim() ?: return
-        val patronymic = row.getCell(2)?.toString()?.trim()
-        val stream = row.getCell(3)?.toString()?.trim() ?: return
-        val group = row.getCell(4)?.toString()?.trim() ?: return
-        val email = row.getCell(5)?.toString()?.trim() ?: return
+        val surname = row.getCell(1)?.toString()?.trim() ?: return
+        val name = row.getCell(2)?.toString()?.trim() ?: return
+        val patronymic = row.getCell(3)?.toString()?.trim()
+        val stream = row.getCell(4)?.toString()?.trim() ?: return
+        val group = row.getCell(5)?.toString()?.trim() ?: return
+        val email = row.getCell(6)?.toString()?.trim() ?: return
 
         val groupStreamKey = "$group-$stream"
 

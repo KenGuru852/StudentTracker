@@ -31,7 +31,12 @@ def generate_english_email(last_name: str, first_name: str, middle_name: str) ->
         return fake_en.email()
 
 # Группы, которые нужно создать
-groups = [f"ИП-11{i}" for i in range(1, 8)]  # ИП-111, ИП-112, ..., ИП-117
+groups = (
+    [f"ИП-11{i}" for i in range(1, 8)] +  # ИП-111, ИП-112, ..., ИП-117
+    [f"ИП-01{i}" for i in range(1, 8)] +  # ИП-011, ИП-012, ..., ИП-017
+    [f"ИС-14{i}" for i in range(1, 3)] +  # ИС-141, ИС-142
+    [f"ИС-04{i}" for i in range(1, 3)]    # ИС-041, ИС-042
+)
 
 for group in groups:
     # Создаем лист для каждой группы
@@ -44,6 +49,16 @@ for group in groups:
     # Жирный шрифт для заголовков
     for cell in ws[1]:
         cell.font = Font(bold=True)
+    
+    # Определяем поток по группе
+    if group.startswith("ИП-1"):
+        stream = "ИП-1**"
+    elif group.startswith("ИП-0"):
+        stream = "ИП-0**"
+    elif group.startswith("ИС-1"):
+        stream = "ИС-1**"
+    else:
+        stream = "ИС-0**"
     
     # Генерация 20 студентов для группы
     for i in range(1, 21):
@@ -61,8 +76,8 @@ for group in groups:
             last_name,
             first_name,
             middle_name,
-            "ИП-1**",  # Поток
-            group,     # Группа
+            stream,  # Поток
+            group,    # Группа
             email
         ])
     

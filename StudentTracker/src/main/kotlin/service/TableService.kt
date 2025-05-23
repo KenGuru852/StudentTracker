@@ -8,93 +8,318 @@ import com.google.api.services.sheets.v4.Sheets
 import com.google.api.services.sheets.v4.model.*
 import com.google.auth.http.HttpCredentialsAdapter
 import com.google.auth.oauth2.GoogleCredentials
-import java.io.FileInputStream
+import org.example.model.TableLink
+import org.example.repository.*
+import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.core.io.Resource
+import org.springframework.stereotype.Service
+import java.time.LocalDateTime
 
-class AttendanceSheetService {
+@Service
+class TableService(
+    @Value("\${google.credentials.path}")
+    private val credentialsResource: Resource,
+    private val studentRepository: StudentRepository,
+    private val scheduleRepository: ScheduleRepository,
+    private val groupStreamRepository: GroupStreamRepository,
+    private val tableLinkRepository: TableLinkRepository
+) {
     companion object {
-        private const val CREDENTIALS_PATH = "src/main/resources/credentials.json"
         private const val APPLICATION_NAME = "Student Attendance Tracker"
         private const val LESSONS_COUNT = 17
+        private const val BASE_SHEETS_URL = "https://docs.google.com/spreadsheets/d/"
+        private val logger = LoggerFactory.getLogger(TableService::class.java)
     }
 
-    private val sheetsService: Sheets by lazy {
-        val credentials = GoogleCredentials.fromStream(FileInputStream(CREDENTIALS_PATH))
-            .createScoped(listOf(
-                "https://www.googleapis.com/auth/spreadsheets",
-                "https://www.googleapis.com/auth/drive"
-            ))
+    private val sheetsService: Sheets by lazy { initSheetsService() }
+    private val driveService: Drive by lazy { initDriveService() }
 
-        val httpTransport = GoogleNetHttpTransport.newTrustedTransport()
-        Sheets.Builder(httpTransport, GsonFactory.getDefaultInstance(), HttpCredentialsAdapter(credentials))
-            .setApplicationName(APPLICATION_NAME)
-            .build()
+    fun createAttendanceSheetsForAllStreams(): Map<String, List<String>> {
+        val result = mutableMapOf<String, List<String>>()
+        logger.info("Starting creation of attendance sheets for all streams")
+
+        try {
+            val streams = groupStreamRepository.findAllStreamNames()
+            logger.info("Found ${streams.size} streams: $streams")
+
+            streams.forEach { stream ->
+                logger.info("Processing stream: $stream")
+                processStream(stream, result)
+            }
+        } catch (e: Exception) {
+            logger.error("Error while creating attendance sheets", e)
+            throw TableGenerationException("Ошибка при создании таблиц: ${e.message}", e)
+        }
+
+        logger.info("Successfully created ${result.size} attendance sheets")
+        return result
     }
 
-    private val driveService: Drive by lazy {
-        val credentials = GoogleCredentials.fromStream(FileInputStream(CREDENTIALS_PATH))
-            .createScoped(listOf(
-                "https://www.googleapis.com/auth/drive",
-                "https://www.googleapis.com/auth/spreadsheets"
-            ))
+    private fun processStream(stream: String, result: MutableMap<String, List<String>>) {
+        logger.debug("Processing stream: $stream")
 
-        val httpTransport = GoogleNetHttpTransport.newTrustedTransport()
-        Drive.Builder(httpTransport, GsonFactory.getDefaultInstance(), HttpCredentialsAdapter(credentials))
-            .setApplicationName(APPLICATION_NAME)
-            .build()
+        val groupsInStream = groupStreamRepository.findGroupNamesByStreamName(stream)
+        if (groupsInStream.isEmpty()) {
+            logger.warn("No groups found for stream: $stream")
+            return
+        }
+        logger.debug("Found groups for stream $stream: $groupsInStream")
+
+        val subjects = scheduleRepository.findDistinctSubjectsByGroups(groupsInStream)
+        if (subjects.isEmpty()) {
+            logger.warn("No subjects found for groups: $groupsInStream")
+            return
+        }
+        logger.debug("Found subjects for stream $stream: $subjects")
+
+        subjects.forEach { subject ->
+            try {
+                val spreadsheetName = "$subject$stream"
+                logger.debug("Processing subject: $subject for stream: $stream")
+
+                val existingLink = tableLinkRepository.findByStreamNameAndSubject(stream, subject)
+                if (existingLink != null) {
+                    logger.info("Found existing table for $spreadsheetName, skipping creation")
+                    result[spreadsheetName] = listOf(existingLink.link)
+                    return@forEach
+                }
+
+                logger.info("Creating new spreadsheet for $spreadsheetName")
+                val spreadsheetId = createNewSpreadsheet(subject, stream, groupsInStream)
+                val url = "$BASE_SHEETS_URL$spreadsheetId"
+
+                logger.debug("Saving table link for $spreadsheetName")
+                saveTableLink(stream, subject, url)
+                result[spreadsheetName] = listOf(url)
+                logger.info("Successfully created spreadsheet: $url")
+            } catch (e: Exception) {
+                logger.error("Error processing subject $subject for stream $stream", e)
+                throw TableGenerationException("Ошибка при обработке потока $stream и предмета $subject: ${e.message}", e)
+            }
+        }
     }
 
-    fun createAttendanceSheet(studentNames: List<String>): String {
-        require(studentNames.isNotEmpty()) { "Student list cannot be empty" }
+    private fun createNewSpreadsheet(subject: String, stream: String, groups: List<String>): String {
+        logger.debug("Creating new spreadsheet for $subject$stream with groups: $groups")
 
         val spreadsheet = Spreadsheet()
-            .setProperties(SpreadsheetProperties().setTitle("Student Attendance - ${java.time.LocalDate.now()}"))
+            .setProperties(SpreadsheetProperties().setTitle("$subject$stream"))
 
-        val createdSpreadsheet = sheetsService.spreadsheets().create(spreadsheet).execute()
+        val createdSpreadsheet = try {
+            sheetsService.spreadsheets().create(spreadsheet).execute()
+        } catch (e: Exception) {
+            logger.error("Failed to create spreadsheet", e)
+            throw e
+        }
+
         val spreadsheetId = createdSpreadsheet.spreadsheetId
+        logger.debug("Created spreadsheet with ID: $spreadsheetId")
 
-        val permission = Permission()
-            .setType("anyone")
-            .setRole("writer")
-            .setAllowFileDiscovery(false)
+        try {
+            logger.debug("Setting permissions for spreadsheet $spreadsheetId")
+            setSpreadsheetPermissions(spreadsheetId)
 
-        driveService.permissions().create(spreadsheetId, permission).execute()
+            logger.debug("Setting up sheets for spreadsheet $spreadsheetId")
+            setupSpreadsheetSheets(spreadsheetId, groups)
+        } catch (e: Exception) {
+            logger.error("Error setting up spreadsheet, attempting to delete", e)
+            try {
+                driveService.files().delete(spreadsheetId).execute()
+                logger.warn("Deleted spreadsheet $spreadsheetId due to setup error")
+            } catch (ignored: Exception) {
+                logger.error("Failed to delete spreadsheet after setup error", ignored)
+            }
+            throw e
+        }
 
-        val requests = mutableListOf<Request>()
-
-        requests.add(createDefaultFormatRequest())
-
-        requests.add(createHeaderRequest())
-
-        requests.add(createStudentNamesRequest(studentNames))
-
-        requests.add(createBordersRequest(studentNames.size))
-
-        requests.add(createAttendancePercentageRequest(studentNames.size))
-
-        requests.add(createAttendanceCountRequest(studentNames.size))
-
-        requests.add(createLessonSummaryRequest(studentNames.size))
-
-        requests.addAll(createFormattingRequests(studentNames.size))
-
-        requests.addAll(createColumnSizingRequests())
-
-        val batchUpdateRequest = BatchUpdateSpreadsheetRequest().setRequests(requests)
-        sheetsService.spreadsheets().batchUpdate(spreadsheetId, batchUpdateRequest).execute()
-
-        return "https://docs.google.com/spreadsheets/d/$spreadsheetId"
+        return spreadsheetId
     }
 
-    private fun createDefaultFormatRequest(): Request {
+    private fun setupSpreadsheetSheets(spreadsheetId: String, groups: List<String>) {
+        logger.debug("Setting up sheets for $spreadsheetId with groups: $groups")
+
+        groups.forEachIndexed { index, group ->
+            try {
+                logger.debug("Processing group $group (index $index)")
+
+                val students = getFormattedStudentNames(group)
+                if (students.isEmpty()) {
+                    logger.warn("No students found for group $group, skipping")
+                    return@forEachIndexed
+                }
+                logger.debug("Found ${students.size} students for group $group")
+
+                if (index > 0) {
+                    logger.debug("Adding new sheet for group $group")
+                    addNewSheet(spreadsheetId, group, index)
+                } else {
+                    logger.debug("Renaming first sheet to $group")
+                    renameFirstSheet(spreadsheetId, group)
+                }
+
+                logger.debug("Filling sheet for group $group")
+                fillSheet(spreadsheetId, index, students)
+                logger.info("Successfully set up sheet for group $group")
+            } catch (e: Exception) {
+                logger.error("Error setting up sheet for group $group", e)
+                throw TableGenerationException("Ошибка при настройке листа для группы $group: ${e.message}", e)
+            }
+        }
+    }
+
+    private fun saveTableLink(stream: String, subject: String, url: String) {
+        logger.debug("Saving table link for stream $stream and subject $subject")
+        tableLinkRepository.save(
+            TableLink(
+                streamName = stream,
+                subject = subject,
+                link = url,
+                createdAt = LocalDateTime.now()
+            )
+        )
+        logger.info("Saved table link: $url")
+    }
+
+    private fun getFormattedStudentNames(group: String): List<String> {
+        logger.debug("Getting student names for group $group")
+        return studentRepository.findByGroupStreamGroupName(group)
+            .map {
+                val name = "${it.surname} ${it.name} ${it.patronymic ?: ""}".trim()
+                logger.trace("Student: $name")
+                name
+            }
+    }
+
+    private fun initSheetsService(): Sheets {
+        logger.info("Initializing Google Sheets service")
+        return try {
+            val credentials = GoogleCredentials.fromStream(credentialsResource.inputStream)
+                .createScoped(listOf(
+                    "https://www.googleapis.com/auth/spreadsheets",
+                    "https://www.googleapis.com/auth/drive"
+                ))
+
+            Sheets.Builder(
+                GoogleNetHttpTransport.newTrustedTransport(),
+                GsonFactory.getDefaultInstance(),
+                HttpCredentialsAdapter(credentials)
+            ).setApplicationName(APPLICATION_NAME)
+                .build()
+        } catch (e: Exception) {
+            logger.error("Failed to initialize Sheets service", e)
+            throw e
+        }
+    }
+
+    private fun initDriveService(): Drive {
+        logger.info("Initializing Google Drive service")
+        return try {
+            val credentials = GoogleCredentials.fromStream(credentialsResource.inputStream)
+                .createScoped(listOf(
+                    "https://www.googleapis.com/auth/drive",
+                    "https://www.googleapis.com/auth/spreadsheets"
+                ))
+
+            Drive.Builder(
+                GoogleNetHttpTransport.newTrustedTransport(),
+                GsonFactory.getDefaultInstance(),
+                HttpCredentialsAdapter(credentials))
+                .setApplicationName(APPLICATION_NAME).build()
+        } catch (e: Exception) {
+            logger.error("Failed to initialize Drive service", e)
+            throw e
+        }
+    }
+
+    private fun setSpreadsheetPermissions(spreadsheetId: String) {
+        logger.debug("Setting permissions for spreadsheet $spreadsheetId")
+        try {
+            driveService.permissions().create(spreadsheetId,
+                Permission().setType("anyone").setRole("writer").setAllowFileDiscovery(false)
+            ).execute()
+            logger.info("Permissions set for spreadsheet $spreadsheetId")
+        } catch (e: Exception) {
+            logger.error("Failed to set permissions for spreadsheet $spreadsheetId", e)
+            throw e
+        }
+    }
+
+    private fun addNewSheet(spreadsheetId: String, groupName: String, sheetId: Int) {
+        logger.debug("Adding new sheet '$groupName' with ID $sheetId to spreadsheet $spreadsheetId")
+        try {
+            sheetsService.spreadsheets().batchUpdate(
+                spreadsheetId,
+                BatchUpdateSpreadsheetRequest().setRequests(listOf(
+                    Request().setAddSheet(
+                        AddSheetRequest().setProperties(
+                            SheetProperties()
+                                .setTitle(groupName)
+                                .setSheetId(sheetId)
+                        )
+                    )
+                ))
+            ).execute()
+            logger.info("Added new sheet '$groupName' successfully")
+        } catch (e: Exception) {
+            logger.error("Failed to add new sheet '$groupName'", e)
+            throw e
+        }
+    }
+
+    private fun renameFirstSheet(spreadsheetId: String, groupName: String) {
+        logger.debug("Renaming first sheet to '$groupName' in spreadsheet $spreadsheetId")
+        try {
+            sheetsService.spreadsheets().batchUpdate(spreadsheetId,
+                BatchUpdateSpreadsheetRequest().setRequests(listOf(
+                    Request().setUpdateSheetProperties(
+                        UpdateSheetPropertiesRequest()
+                            .setProperties(SheetProperties().setSheetId(0).setTitle(groupName))
+                            .setFields("title")
+                    )
+                ))
+            ).execute()
+            logger.info("Renamed first sheet to '$groupName' successfully")
+        } catch (e: Exception) {
+            logger.error("Failed to rename first sheet to '$groupName'", e)
+            throw e
+        }
+    }
+
+    private fun fillSheet(spreadsheetId: String, sheetId: Int, studentNames: List<String>) {
+        logger.debug("Filling sheet ID $sheetId with ${studentNames.size} students")
+        try {
+            val requests = mutableListOf<Request>().apply {
+                add(setBaseFormattingRequest(sheetId, studentNames.size))
+                add(createHeaderRequest(sheetId))
+                add(createStudentNamesRequest(sheetId, studentNames))
+                add(createAttendancePercentageRequest(sheetId, studentNames.size))
+                add(createAttendanceCountRequest(sheetId, studentNames.size))
+                add(createLessonSummaryRequest(sheetId, studentNames.size))
+                add(createBordersRequest(sheetId, studentNames.size))
+                addAll(createColumnSizingRequests(sheetId))
+            }
+
+            sheetsService.spreadsheets().batchUpdate(spreadsheetId,
+                BatchUpdateSpreadsheetRequest().setRequests(requests)
+            ).execute()
+            logger.info("Successfully filled sheet ID $sheetId")
+        } catch (e: Exception) {
+            logger.error("Failed to fill sheet ID $sheetId", e)
+            throw e
+        }
+    }
+
+    private fun setBaseFormattingRequest(sheetId: Int, studentCount: Int): Request {
         return Request().setRepeatCell(
             RepeatCellRequest()
                 .setRange(
                     GridRange()
-                        .setSheetId(0)
+                        .setSheetId(sheetId)
                         .setStartRowIndex(0)
-                        .setEndRowIndex(1000)
+                        .setEndRowIndex(studentCount + 2)
                         .setStartColumnIndex(0)
-                        .setEndColumnIndex(1000)
+                        .setEndColumnIndex(LESSONS_COUNT + 3)
                 )
                 .setCell(
                     CellData()
@@ -103,16 +328,16 @@ class AttendanceSheetService {
                                 .setTextFormat(
                                     TextFormat()
                                         .setFontFamily("Tahoma")
-                                        .setFontSize(18)
+                                        .setFontSize(12)
                                 )
                                 .setHorizontalAlignment("CENTER")
                         )
                 )
-                .setFields("userEnteredFormat.textFormat.fontFamily,userEnteredFormat.textFormat.fontSize,userEnteredFormat.horizontalAlignment")
+                .setFields("userEnteredFormat")
         )
     }
 
-    private fun createHeaderRequest(): Request {
+    private fun createHeaderRequest(sheetId: Int): Request {
         val headerValues = listOf(
             listOf("Неделя/Студент", *(1..LESSONS_COUNT).map { "$it" }.toTypedArray(), "%", "кол-во")
         )
@@ -121,32 +346,34 @@ class AttendanceSheetService {
             UpdateCellsRequest()
                 .setStart(
                     GridCoordinate()
-                        .setSheetId(0)
+                        .setSheetId(sheetId)
                         .setRowIndex(0)
                         .setColumnIndex(0)
                 )
-                .setRows(listOf(
-                    RowData().setValues(
-                        headerValues[0].map { value ->
-                            CellData()
-                                .setUserEnteredValue(ExtendedValue().setStringValue(value))
-                                .setUserEnteredFormat(
-                                    CellFormat()
-                                        .setTextFormat(TextFormat().setBold(true))
-                                )
-                        }
+                .setRows(
+                    listOf(
+                        RowData().setValues(
+                            headerValues[0].map { value ->
+                                CellData()
+                                    .setUserEnteredValue(ExtendedValue().setStringValue(value))
+                                    .setUserEnteredFormat(
+                                        CellFormat()
+                                            .setTextFormat(TextFormat().setBold(true))
+                                    )
+                            }
+                        )
                     )
-                ))
+                )
                 .setFields("userEnteredValue,userEnteredFormat.textFormat.bold")
         )
     }
 
-    private fun createStudentNamesRequest(studentNames: List<String>): Request {
+    private fun createStudentNamesRequest(sheetId: Int, studentNames: List<String>): Request {
         return Request().setUpdateCells(
             UpdateCellsRequest()
                 .setStart(
                     GridCoordinate()
-                        .setSheetId(0)
+                        .setSheetId(sheetId)
                         .setRowIndex(1)
                         .setColumnIndex(0)
                 )
@@ -165,43 +392,23 @@ class AttendanceSheetService {
         )
     }
 
-    private fun createBordersRequest(studentCount: Int): Request {
-        return Request().setUpdateBorders(
-            UpdateBordersRequest()
-                .setRange(
-                    GridRange()
-                        .setSheetId(0)
-                        .setStartRowIndex(0)
-                        .setEndRowIndex(studentCount + 2)
-                        .setStartColumnIndex(0)
-                        .setEndColumnIndex(LESSONS_COUNT + 3)
-                )
-                .setTop(Border().setStyle("SOLID").setColor(Color().setRed(0f).setGreen(0f).setBlue(0f)))
-                .setBottom(Border().setStyle("SOLID").setColor(Color().setRed(0f).setGreen(0f).setBlue(0f)))
-                .setLeft(Border().setStyle("SOLID").setColor(Color().setRed(0f).setGreen(0f).setBlue(0f)))
-                .setRight(Border().setStyle("SOLID").setColor(Color().setRed(0f).setGreen(0f).setBlue(0f)))
-                .setInnerHorizontal(Border().setStyle("SOLID").setColor(Color().setRed(0f).setGreen(0f).setBlue(0f)))
-                .setInnerVertical(Border().setStyle("SOLID").setColor(Color().setRed(0f).setGreen(0f).setBlue(0f)))
-        )
-    }
-
-    private fun createAttendancePercentageRequest(studentCount: Int): Request {
+    private fun createAttendancePercentageRequest(sheetId: Int, studentCount: Int): Request {
         return Request().setUpdateCells(
             UpdateCellsRequest()
                 .setStart(
                     GridCoordinate()
-                        .setSheetId(0)
+                        .setSheetId(sheetId)
                         .setRowIndex(1)
                         .setColumnIndex(LESSONS_COUNT + 1)
                 )
                 .setRows(
-                    (2..studentCount + 1).map { row ->
-                        val range = "B$row:${('A' + LESSONS_COUNT).toChar()}$row"
+                    (1..studentCount).map { row ->
+                        val range = "B${row + 1}:${('A' + LESSONS_COUNT)}$row}"
                         RowData().setValues(
                             listOf(
                                 CellData().setUserEnteredValue(
                                     ExtendedValue().setFormulaValue(
-                                        "=ROUND(100*(COUNTIF($range,1)/$LESSONS_COUNT), 1) & \"%\""
+                                        "=ROUND(100*(COUNTIF($range,\"1\")/$LESSONS_COUNT), 1) & \"%\""
                                     )
                                 )
                             )
@@ -212,23 +419,23 @@ class AttendanceSheetService {
         )
     }
 
-    private fun createAttendanceCountRequest(studentCount: Int): Request {
+    private fun createAttendanceCountRequest(sheetId: Int, studentCount: Int): Request {
         return Request().setUpdateCells(
             UpdateCellsRequest()
                 .setStart(
                     GridCoordinate()
-                        .setSheetId(0)
+                        .setSheetId(sheetId)
                         .setRowIndex(1)
                         .setColumnIndex(LESSONS_COUNT + 2)
                 )
                 .setRows(
-                    (2..studentCount + 1).map { row ->
-                        val range = "B$row:${('A' + LESSONS_COUNT).toChar()}$row"
+                    (1..studentCount).map { row ->
+                        val range = "B${row + 1}:${('A' + LESSONS_COUNT)}$row}"
                         RowData().setValues(
                             listOf(
                                 CellData().setUserEnteredValue(
                                     ExtendedValue().setFormulaValue(
-                                        "=COUNTIF($range,1)"
+                                        "=COUNTIF($range,\"1\")"
                                     )
                                 )
                             )
@@ -239,12 +446,12 @@ class AttendanceSheetService {
         )
     }
 
-    private fun createLessonSummaryRequest(studentCount: Int): Request {
+    private fun createLessonSummaryRequest(sheetId: Int, studentCount: Int): Request {
         return Request().setUpdateCells(
             UpdateCellsRequest()
                 .setStart(
                     GridCoordinate()
-                        .setSheetId(0)
+                        .setSheetId(sheetId)
                         .setRowIndex(studentCount + 1)
                         .setColumnIndex(0)
                 )
@@ -259,7 +466,7 @@ class AttendanceSheetService {
                                     val colLetter = ('A' + lessonCol).toChar()
                                     CellData().setUserEnteredValue(
                                         ExtendedValue().setFormulaValue(
-                                            "=COUNTIF(${colLetter}2:${colLetter}${studentCount + 1},1)"
+                                            "=COUNTIF(${colLetter}2:${colLetter}${studentCount + 1},\"1\")"
                                         )
                                     )
                                 }.toTypedArray(),
@@ -273,95 +480,55 @@ class AttendanceSheetService {
         )
     }
 
-    private fun createFormattingRequests(studentCount: Int): List<Request> {
-        return listOf(
-            Request().setRepeatCell(
-                RepeatCellRequest()
-                    .setRange(
-                        GridRange()
-                            .setSheetId(0)
-                            .setStartRowIndex(1)
-                            .setEndRowIndex(studentCount + 1)
-                            .setStartColumnIndex(0)
-                            .setEndColumnIndex(1)
-                    )
-                    .setCell(
-                        CellData()
-                            .setUserEnteredFormat(
-                                CellFormat()
-                                    .setHorizontalAlignment("LEFT")
-                            )
-                    )
-                    .setFields("userEnteredFormat.horizontalAlignment")
-            ),
-
-            Request().setRepeatCell(
-                RepeatCellRequest()
-                    .setRange(
-                        GridRange()
-                            .setSheetId(0)
-                            .setStartRowIndex(0)
-                            .setEndRowIndex(1)
-                            .setStartColumnIndex(0)
-                            .setEndColumnIndex(LESSONS_COUNT + 3)
-                    )
-                    .setCell(
-                        CellData()
-                            .setUserEnteredFormat(
-                                CellFormat()
-                                    .setHorizontalAlignment("CENTER")
-                            )
-                    )
-                    .setFields("userEnteredFormat.horizontalAlignment")
-            ),
-
-            Request().setRepeatCell(
-                RepeatCellRequest()
-                    .setRange(
-                        GridRange()
-                            .setSheetId(0)
-                            .setStartRowIndex(studentCount + 1)
-                            .setEndRowIndex(studentCount + 2)
-                            .setStartColumnIndex(0)
-                            .setEndColumnIndex(LESSONS_COUNT + 3)
-                    )
-                    .setCell(
-                        CellData()
-                            .setUserEnteredFormat(
-                                CellFormat()
-                                    .setTextFormat(TextFormat().setBold(true))
-                            )
-                    )
-                    .setFields("userEnteredFormat.textFormat.bold")
-            )
+    private fun createBordersRequest(sheetId: Int, studentCount: Int): Request {
+        return Request().setUpdateBorders(
+            UpdateBordersRequest()
+                .setRange(
+                    GridRange()
+                        .setSheetId(sheetId)
+                        .setStartRowIndex(0)
+                        .setEndRowIndex(studentCount + 2)
+                        .setStartColumnIndex(0)
+                        .setEndColumnIndex(LESSONS_COUNT + 3)
+                )
+                .setTop(Border().setStyle("SOLID").setWidth(1))
+                .setBottom(Border().setStyle("SOLID").setWidth(1))
+                .setLeft(Border().setStyle("SOLID").setWidth(1))
+                .setRight(Border().setStyle("SOLID").setWidth(1))
+                .setInnerHorizontal(Border().setStyle("SOLID").setWidth(1))
+                .setInnerVertical(Border().setStyle("SOLID").setWidth(1))
         )
     }
 
-    private fun createColumnSizingRequests(): List<Request> {
+    private fun createColumnSizingRequests(sheetId: Int): List<Request> {
         return listOf(
-            Request().setAutoResizeDimensions(
-                AutoResizeDimensionsRequest()
-                    .setDimensions(
-                        DimensionRange()
-                            .setSheetId(0)
-                            .setDimension("COLUMNS")
-                            .setStartIndex(0)
-                            .setEndIndex(1)
-                    )
-            ),
-
             Request().setUpdateDimensionProperties(
                 UpdateDimensionPropertiesRequest()
                     .setRange(
                         DimensionRange()
-                            .setSheetId(0)
+                            .setSheetId(sheetId)
+                            .setDimension("COLUMNS")
+                            .setStartIndex(0)
+                            .setEndIndex(1)
+                    )
+                    .setProperties(
+                        DimensionProperties()
+                            .setPixelSize(200)
+                    )
+                    .setFields("pixelSize")
+            ),
+            Request().setUpdateDimensionProperties(
+                UpdateDimensionPropertiesRequest()
+                    .setRange(
+                        DimensionRange()
+                            .setSheetId(sheetId)
                             .setDimension("COLUMNS")
                             .setStartIndex(1)
                             .setEndIndex(LESSONS_COUNT + 3)
                     )
                     .setProperties(
                         DimensionProperties()
-                            .setPixelSize(100)
+                            .setPixelSize(80)
                     )
                     .setFields("pixelSize")
             )
@@ -369,37 +536,5 @@ class AttendanceSheetService {
     }
 }
 
-fun main() {
-    val service = AttendanceSheetService()
-
-    val students = listOf(
-        "Иванов Иван Иванович",
-        "Петров Петр Петрович",
-        "Сидорова Анна Михайловна",
-        "Кузнецов Алексей Сергеевич",
-        "Смирнова Мария Владимировна",
-        "Попов Дмитрий Александрович",
-        "Васильева Ольга Николаевна",
-        "Морозов Сергей Викторович",
-        "Федорова Екатерина Андреевна",
-        "Соловьев Николай Павлович",
-        "Зайцева Татьяна Юрьевна",
-        "Ковалев Артем Сергеевич",
-        "Лебедева Светлана Игоревна",
-        "Григорьев Андрей Валерьевич",
-        "Тихонов Денис Олегович",
-        "Климова Наталья Сергеевна",
-        "Семенов Илья Дмитриевич",
-        "Борисова Анастасия Викторовна",
-        "Сергеев Владислав Юрьевич",
-        "Михайлова Дарья Александровна",
-        "Кузьмина Виктория Анатольевна",
-        "Егоров Роман Валентинович",
-        "Савельев Арсений Ильич",
-        "Никитина Полина Сергеевна",
-        "Фролов Константин Дмитриевич"
-    )
-
-    val sheetUrl = service.createAttendanceSheet(students)
-    println("Таблица посещаемости создана: $sheetUrl")
-}
+class TableGenerationException(message: String, cause: Throwable?) :
+    RuntimeException(message, cause)
