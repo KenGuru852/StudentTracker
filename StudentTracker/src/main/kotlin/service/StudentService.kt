@@ -6,6 +6,7 @@ import org.example.model.GroupStream
 import org.example.model.Student
 import org.example.repository.GroupStreamRepository
 import org.example.repository.StudentRepository
+import org.springframework.cache.annotation.Cacheable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.multipart.MultipartFile
@@ -84,6 +85,12 @@ class StudentService(
                 groupStream = groupStream
             )
         )
+    }
+
+    @Cacheable("studentsCache", key = "#group")
+    fun getFormattedStudentNames(group: String): List<String> {
+        return studentRepository.findByGroupStreamGroupName(group)
+            .map { "${it.surname} ${it.name} ${it.patronymic ?: ""}".trim() }
     }
 }
 

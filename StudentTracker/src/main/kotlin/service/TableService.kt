@@ -12,20 +12,23 @@ import org.example.model.TableLink
 import org.example.repository.*
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.cache.annotation.CacheConfig
+import org.springframework.cache.annotation.Cacheable
 import org.springframework.core.io.Resource
 import org.springframework.stereotype.Service
-import java.sql.Types.CHAR
 import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit
 
 @Service
+@CacheConfig(cacheNames = ["studentsCache"])
 class TableService(
     @Value("\${google.credentials.path}")
     private val credentialsResource: Resource,
     private val studentRepository: StudentRepository,
     private val scheduleRepository: ScheduleRepository,
     private val groupStreamRepository: GroupStreamRepository,
-    private val tableLinkRepository: TableLinkRepository
+    private val tableLinkRepository: TableLinkRepository,
+    private val studentService: StudentService
 ) {
     companion object {
         private const val APPLICATION_NAME = "Student Attendance Tracker"
@@ -149,6 +152,13 @@ class TableService(
     private fun setupSpreadsheetSheets(spreadsheetId: String, groups: List<String>) {
         logger.debug("Setting up sheets for spreadsheet $spreadsheetId with groups: $groups")
 
+        // Получаем всех студентов для всех групп через сервис
+        val studentsByGroup = groups.associateWith { group ->
+            studentService.getFormattedStudentNames(group).also {
+                logger.debug("Found ${it.size} students for group $group")
+            }
+        }
+
         // Собираем все запросы в один пакет
         val batchRequests = mutableListOf<Request>()
 
@@ -156,7 +166,7 @@ class TableService(
             try {
                 logger.debug("Processing group $group (index $index)")
 
-                val students = getFormattedStudentNames(group)
+                val students = studentsByGroup[group] ?: emptyList()
                 if (students.isEmpty()) {
                     logger.warn("No students found for group $group, skipping sheet creation")
                     return@forEachIndexed
@@ -181,15 +191,15 @@ class TableService(
                 spreadsheetId,
                 BatchUpdateSpreadsheetRequest().setRequests(batchRequests)
             ).execute()
-            TimeUnit.MILLISECONDS.sleep(API_DELAY_MS) // Задержка после пакетного обновления
+            TimeUnit.MILLISECONDS.sleep(API_DELAY_MS)
         }
 
         // Заполняем данные на листах
         groups.forEachIndexed { index, group ->
-            val students = getFormattedStudentNames(group)
-            if (students.isNotEmpty()) {
+            val students = studentsByGroup[group]
+            if (students != null && students.isNotEmpty()) {
                 fillSheet(spreadsheetId, index, students)
-                TimeUnit.MILLISECONDS.sleep(API_DELAY_MS) // Задержка после заполнения листа
+                TimeUnit.MILLISECONDS.sleep(API_DELAY_MS)
             }
         }
     }
@@ -204,13 +214,6 @@ class TableService(
                 createdAt = LocalDateTime.now()
             )
         )
-    }
-
-    private fun getFormattedStudentNames(group: String): List<String> {
-        logger.debug("Getting student names for group $group")
-        return studentRepository.findByGroupStreamGroupName(group)
-            .map { "${it.surname} ${it.name} ${it.patronymic ?: ""}".trim() }
-            .also { logger.debug("Found ${it.size} students for group $group") }
     }
 
     private fun initSheetsService(): Sheets {

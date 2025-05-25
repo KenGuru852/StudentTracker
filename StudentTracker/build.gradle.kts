@@ -31,6 +31,10 @@ dependencies {
     implementation("com.google.api-client:google-api-client:2.7.2")
 
     implementation("com.google.apis:google-api-services-drive:v3-rev20250511-2.0.0")
+
+    implementation("org.springframework.boot:spring-boot-starter-cache")
+    implementation("com.github.ben-manes.caffeine:caffeine")
+
 }
 
 tasks.test {
