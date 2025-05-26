@@ -47,6 +47,19 @@ app.get('/api/getFilteredLinks', async (req, res) => {
     }
 });
 
+app.post('/api/clearAllData', async (req, res) => {
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/clearAllData`, {
+            method: 'POST'
+        });
+        
+        res.status(response.status).send(await response.text());
+    } catch (error) {
+        console.error('Backend connection error:', error);
+        res.status(502).send('Ошибка соединения с бэкендом');
+    }
+});
+
 app.post('/api/generateTables', async (req, res) => {
     try {
         if (!req.files?.jsonFile || !req.files?.xlsxFile) {

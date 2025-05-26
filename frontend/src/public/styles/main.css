@@ -102,3 +102,42 @@ button:hover {
 #applyFiltersBtn:hover {
     background-color: #0b7dda;
 }
+
+.danger-btn {
+    background-color: #f44336;
+    margin-left: 10px;
+}
+
+.danger-btn:hover {
+    background-color: #d32f2f;
+}
+
+.confirmation-dialog {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 20px;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    z-index: 1000;
+}
+
+.confirmation-dialog p {
+    margin-bottom: 15px;
+}
+
+.confirmation-dialog button {
+    margin-right: 10px;
+}
+
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255,0,0,0.5);
+    z-index: 999;
+}

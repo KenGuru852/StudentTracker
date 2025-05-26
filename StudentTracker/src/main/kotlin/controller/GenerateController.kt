@@ -1,5 +1,10 @@
 package org.example.controller
 
+import org.example.repository.GroupStreamRepository
+import org.example.repository.ScheduleRepository
+import org.example.repository.StudentRepository
+import org.example.repository.TableLinkRepository
+import org.example.service.DatabaseService
 import org.example.service.ScheduleService
 import org.example.service.StudentService
 import org.example.service.TableService
@@ -7,6 +12,7 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 
@@ -16,6 +22,7 @@ class GenerateController(
     private val studentService: StudentService,
     private val scheduleService: ScheduleService,
     private val tableService: TableService,
+    private val databaseService: DatabaseService,
     private val logger: Logger? = LoggerFactory.getLogger(TableService::class.java)
 ) {
 
@@ -61,6 +68,19 @@ class GenerateController(
             logger!!.error("Error while filtering tables", e)
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(listOf(mapOf("error" to "Ошибка при фильтрации таблиц: ${e.message}")))
+        }
+    }
+
+    @PostMapping("/clearAllData")
+    fun clearAllData(): ResponseEntity<String> {
+        return try {
+            databaseService.clearAllData()
+
+            ResponseEntity.ok("Все данные успешно очищены")
+        } catch (e: Exception) {
+            logger!!.error("Error clearing data", e)
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Ошибка при очистке данных: ${e.message ?: "Unknown error"}")
         }
     }
 }

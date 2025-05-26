@@ -11,6 +11,75 @@ document.addEventListener('DOMContentLoaded', () => {
     // Загружаем таблицы при старте (если они есть)
     displayFilteredTables();
 
+    const clearDataBtn = document.getElementById('clearDataBtn');
+
+    clearDataBtn.addEventListener('click', async () => {
+        // Показываем диалог подтверждения
+        const confirmed = await showConfirmationDialog(
+            'Вы уверены, что хотите очистить все данные?',
+            'Это действие удалит все таблицы, студентов, группы и расписание. Отменить это действие будет невозможно.'
+        );
+        
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            resultDiv.textContent = 'Очистка данных...';
+            
+            const response = await fetch('/api/clearAllData', {
+                method: 'POST'
+            });
+
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(error || `Ошибка сервера: ${response.status}`);
+            }
+
+            resultDiv.textContent = 'Все данные успешно очищены!';
+            displayFilteredTables();
+            
+        } catch (error) {
+            resultDiv.textContent = `Ошибка: ${error.message}`;
+            console.error('Ошибка при очистке данных:', error);
+        }
+    });
+
+    // Функция для показа диалога подтверждения
+    function showConfirmationDialog(title, message) {
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.className = 'overlay';
+            
+            const dialog = document.createElement('div');
+            dialog.className = 'confirmation-dialog';
+            dialog.innerHTML = `
+                <h3>${title}</h3>
+                <p>${message}</p>
+                <button id="confirmYes">Да, очистить</button>
+                <button id="confirmNo">Отмена</button>
+            `;
+            
+            document.body.appendChild(overlay);
+            document.body.appendChild(dialog);
+            
+            const confirmYes = document.getElementById('confirmYes');
+            const confirmNo = document.getElementById('confirmNo');
+            
+            confirmYes.addEventListener('click', () => {
+                document.body.removeChild(overlay);
+                document.body.removeChild(dialog);
+                resolve(true);
+            });
+            
+            confirmNo.addEventListener('click', () => {
+                document.body.removeChild(overlay);
+                document.body.removeChild(dialog);
+                resolve(false);
+            });
+        });
+    }
+
     // Обработчик для кнопки "Генерировать"
     generateBtn.addEventListener('click', async () => {
         const jsonFile = jsonFileInput.files[0];
