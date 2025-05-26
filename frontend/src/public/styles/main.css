@@ -42,3 +42,63 @@ button:hover {
     background-color: #f9f9f9;
     white-space: pre-wrap;
 }
+
+/* Объединённый блок .filters */
+.filters {
+    margin-top: 20px;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+    display: block; /* Явно указываем, что блок должен отображаться */
+}
+
+.filter {
+    margin-bottom: 15px;
+}
+
+.filter label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.filter input[type="text"] {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+#filteredResults {
+    margin-top: 20px;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+}
+
+.table-link {
+    display: block;
+    margin: 5px 0;
+    padding: 8px;
+    background-color: #e9f7ef;
+    border-radius: 4px;
+    color: #2e7d32;
+    text-decoration: none;
+}
+
+.table-link:hover {
+    background-color: #d4edda;
+}
+
+/* Стиль для кнопки "Применить фильтры" */
+#applyFiltersBtn {
+    margin-top: 10px;
+    background-color: #2196F3;
+}
+
+#applyFiltersBtn:hover {
+    background-color: #0b7dda;
+}

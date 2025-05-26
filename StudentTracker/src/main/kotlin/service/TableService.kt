@@ -13,7 +13,6 @@ import org.example.repository.*
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.cache.annotation.CacheConfig
-import org.springframework.cache.annotation.Cacheable
 import org.springframework.core.io.Resource
 import org.springframework.stereotype.Service
 import java.time.LocalDateTime
@@ -93,11 +92,12 @@ class TableService(
                     logger.info("Processing subject $subject for stream $stream")
 
                     val spreadsheetName = "$subject$stream"
-                    val existingLink = tableLinkRepository.findByStreamNameAndSubject(stream, subject)
+                    // Changed to use the new repository method
+                    val existingLinks = tableLinkRepository.findByStreamNameContainingIgnoreCaseAndSubjectContainingIgnoreCase(stream, subject)
 
-                    if (existingLink != null) {
-                        logger.info("Spreadsheet already exists for $spreadsheetName, skipping creation")
-                        result[spreadsheetName] = listOf(existingLink.link)
+                    if (existingLinks.isNotEmpty()) {
+                        logger.info("Spreadsheet already exists for $spreadsheetName, using existing link")
+                        result[spreadsheetName] = existingLinks.map { it.link }
                         return@forEach
                     }
 
@@ -580,6 +580,37 @@ class TableService(
                     .setFields("pixelSize")
             )
         )
+    }
+
+    fun getFilteredTableLinks(streamName: String?, subject: String?): List<TableLink> {
+        logger.info("Filtering table links. Stream: '$streamName', Subject: '$subject'")
+
+        return try {
+            val result = when {
+                streamName != null && subject != null -> {
+                    logger.debug("Both filters present")
+                    tableLinkRepository.findByStreamNameContainingIgnoreCaseAndSubjectContainingIgnoreCase(streamName, subject)
+                }
+                streamName != null -> {
+                    logger.debug("Only stream filter present")
+                    tableLinkRepository.findByStreamNameContainingIgnoreCase(streamName)
+                }
+                subject != null -> {
+                    logger.debug("Only subject filter present")
+                    tableLinkRepository.findBySubjectContainingIgnoreCase(subject)
+                }
+                else -> {
+                    logger.debug("No filters, returning all")
+                    tableLinkRepository.findAll()
+                }
+            }
+
+            logger.info("Found ${result.size} matching table links")
+            result
+        } catch (e: Exception) {
+            logger.error("Error in getFilteredTableLinks", e)
+            throw e
+        }
     }
 }
 

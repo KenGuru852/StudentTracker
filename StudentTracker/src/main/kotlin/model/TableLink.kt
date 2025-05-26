@@ -23,4 +23,6 @@ data class TableLink(
 
     @Column(name = "created_at", nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now()
-)
+) {
+    constructor() : this(null, "", "", "", LocalDateTime.now())
+}

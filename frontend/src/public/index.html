@@ -21,7 +21,21 @@
     
     <button id="generateBtn">Генерировать</button>
     
+    <!-- Добавляем блок с фильтрами -->
+    <div class="filters" id="filters">
+        <div class="filter">
+            <label for="streamFilter">Фильтр по потоку:</label>
+            <input type="text" id="streamFilter" placeholder="Введите часть названия потока">
+        </div>
+        <div class="filter">
+            <label for="subjectFilter">Фильтр по предмету:</label>
+            <input type="text" id="subjectFilter" placeholder="Введите часть названия предмета">
+        </div>
+        <button id="applyFiltersBtn">Применить фильтры</button>
+    </div>
+    
     <div id="result"></div>
+    <div id="filteredResults"></div>
 
     <script src="/js/app.js"></script>
 </body>

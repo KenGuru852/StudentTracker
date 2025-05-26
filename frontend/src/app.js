@@ -4,18 +4,47 @@ const fileUpload = require('express-fileupload');
 const FormData = require('form-data');
 const fetch = (...args) =>
     import('node-fetch').then(({ default: fetch }) => fetch(...args));
+const cors = require('cors'); // Импортируем cors
+
 const app = express();
 const PORT = 3000;
 
 const BACKEND_URL = 'http://backend:8080'; 
 
+app.use(cors()); // Используем cors
 app.use(fileUpload());
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/styles', express.static(path.join(__dirname, 'public', 'styles')));
 app.use('/js', express.static(path.join(__dirname, 'public', 'js')));
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/api/getFilteredLinks', async (req, res) => {
+    try {
+        const { stream, subject } = req.query;
+        const params = new URLSearchParams();
+        if (stream) params.append('stream', stream);
+        if (subject) params.append('subject', subject);
+        
+        const response = await fetch(`${BACKEND_URL}/api/getFilteredLinks?${params}`);
+        
+        if (!response.ok) {
+            throw new Error(`Backend error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        res.set('Content-Type', 'application/json');
+        res.send(data);
+    } catch (error) {
+        console.error('Proxy error:', error);
+        res.status(500).json({ 
+            error: error.message,
+            details: `Failed to connect to backend at ${BACKEND_URL}`
+        });
+    }
 });
 
 app.post('/api/generateTables', async (req, res) => {
