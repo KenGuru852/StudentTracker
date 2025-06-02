@@ -7,6 +7,7 @@ import org.example.repository.ScheduleRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.multipart.MultipartFile
+import kotlin.jvm.optionals.toList
 
 @Service
 class ScheduleService(
@@ -17,6 +18,9 @@ class ScheduleService(
 
     @Transactional
     fun processScheduleJsonFile(file: MultipartFile): List<Schedule> {
+        if (scheduleRepository.findAll().isNotEmpty()){
+            return scheduleRepository.findById(1).toList()
+        }
 
         val jsonString = String(file.bytes)
         val schedules = parseSchedulesFromJson(jsonString)

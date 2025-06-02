@@ -8,6 +8,9 @@ import com.google.api.services.sheets.v4.Sheets
 import com.google.api.services.sheets.v4.model.*
 import com.google.auth.http.HttpCredentialsAdapter
 import com.google.auth.oauth2.GoogleCredentials
+import org.example.model.GroupStream
+import org.example.model.Schedule
+import org.example.model.Student
 import org.example.model.TableLink
 import org.example.repository.*
 import org.slf4j.LoggerFactory
@@ -16,7 +19,6 @@ import org.springframework.cache.annotation.CacheConfig
 import org.springframework.core.io.Resource
 import org.springframework.stereotype.Service
 import java.time.LocalDateTime
-import java.util.concurrent.TimeUnit
 
 @Service
 @CacheConfig(cacheNames = ["studentsCache"])
@@ -33,7 +35,7 @@ class TableService(
         private const val APPLICATION_NAME = "Student Attendance Tracker"
         private const val LESSONS_COUNT = 17
         private const val BASE_SHEETS_URL = "https://docs.google.com/spreadsheets/d/"
-        private const val API_DELAY_MS = 1500L // Задержка между запросами в миллисекундах
+        private const val API_DELAY_MS = 1500L
         private val logger = LoggerFactory.getLogger(TableService::class.java)
     }
 
@@ -45,16 +47,22 @@ class TableService(
         logger.info("Starting creation of attendance sheets for all streams")
 
         try {
-            val streams = groupStreamRepository.findAllStreamNames()
-            logger.info("Found ${streams.size} streams: $streams")
+            // Получаем все данные одним запросом
+            val allStreams = groupStreamRepository.findAll()
+            val allGroups = allStreams.map { it.groupName }
+            val allSchedules = scheduleRepository.findByGroupNameIn(allGroups)
+            val allStudents = studentRepository.findAll()
+            val existingLinks = tableLinkRepository.findAll()
 
-            streams.forEachIndexed { index, stream ->
-                if (index > 0) {
-                    // Добавляем задержку между обработкой потоков
-                    TimeUnit.MILLISECONDS.sleep(API_DELAY_MS)
-                }
+            // Группируем данные для быстрого доступа
+            val streamsMap = allStreams.groupBy { it.streamName }
+            val schedulesMap = allSchedules.groupBy { it.groupName }
+            val studentsMap = allStudents.groupBy { it.groupStream.groupName }
+            val existingLinksMap = existingLinks.groupBy { "${it.subject}${it.streamName}" }
+
+            streamsMap.keys.forEachIndexed { index, stream ->
                 logger.info("Processing stream: $stream")
-                processStream(stream, result)
+                processStreamOptimized(stream, streamsMap, schedulesMap, studentsMap, existingLinksMap, result)
             }
 
             logger.info("Successfully created ${result.size} spreadsheets")
@@ -66,43 +74,44 @@ class TableService(
         return result
     }
 
-    private fun processStream(stream: String, result: MutableMap<String, List<String>>) {
+    private fun processStreamOptimized(
+        stream: String,
+        streamsMap: Map<String, List<GroupStream>>,
+        schedulesMap: Map<String, List<Schedule>>,
+        studentsMap: Map<String, List<Student>>,
+        existingLinksMap: Map<String, List<TableLink>>,
+        result: MutableMap<String, List<String>>
+    ) {
         try {
-            val groupsInStream = groupStreamRepository.findGroupNamesByStreamName(stream)
+            val groupsInStream = streamsMap[stream]?.map { it.groupName } ?: emptyList()
             if (groupsInStream.isEmpty()) {
                 logger.warn("No groups found for stream $stream")
                 return
             }
-            logger.info("Found ${groupsInStream.size} groups in stream $stream: $groupsInStream")
 
-            val subjects = scheduleRepository.findDistinctSubjectsByGroups(groupsInStream)
+            val subjects = groupsInStream.flatMap {
+                schedulesMap[it]?.map { it.subject } ?: emptyList()
+            }.distinct()
+
             if (subjects.isEmpty()) {
                 logger.warn("No subjects found for groups in stream $stream")
                 return
             }
-            logger.info("Found ${subjects.size} subjects for stream $stream: $subjects")
 
-            subjects.forEachIndexed forEach@{ index, subject ->
+            subjects.forEachIndexed { index, subject ->
                 try {
-                    if (index > 0) {
-                        // Добавляем задержку между обработкой предметов
-                        TimeUnit.MILLISECONDS.sleep(API_DELAY_MS)
-                    }
-
                     logger.info("Processing subject $subject for stream $stream")
-
                     val spreadsheetName = "$subject$stream"
-                    // Changed to use the new repository method
-                    val existingLinks = tableLinkRepository.findByStreamNameContainingIgnoreCaseAndSubjectContainingIgnoreCase(stream, subject)
+                    val existingLinks = existingLinksMap[spreadsheetName]
 
-                    if (existingLinks.isNotEmpty()) {
+                    if (!existingLinks.isNullOrEmpty()) {
                         logger.info("Spreadsheet already exists for $spreadsheetName, using existing link")
                         result[spreadsheetName] = existingLinks.map { it.link }
-                        return@forEach
+                        return@forEachIndexed
                     }
 
                     logger.info("Creating new spreadsheet for $spreadsheetName")
-                    val spreadsheetId = createNewSpreadsheet(subject, stream, groupsInStream)
+                    val spreadsheetId = createNewSpreadsheetOptimized(subject, stream, groupsInStream, studentsMap)
                     val url = "$BASE_SHEETS_URL$spreadsheetId"
 
                     saveTableLink(stream, subject, url)
@@ -119,7 +128,12 @@ class TableService(
         }
     }
 
-    private fun createNewSpreadsheet(subject: String, stream: String, groups: List<String>): String {
+    private fun createNewSpreadsheetOptimized(
+        subject: String,
+        stream: String,
+        groups: List<String>,
+        studentsMap: Map<String, List<Student>>
+    ): String {
         logger.debug("Creating new spreadsheet for subject $subject and stream $stream")
 
         val spreadsheet = Spreadsheet()
@@ -131,9 +145,8 @@ class TableService(
 
         try {
             setSpreadsheetPermissions(spreadsheetId)
-            TimeUnit.MILLISECONDS.sleep(API_DELAY_MS) // Задержка после создания таблицы
 
-            setupSpreadsheetSheets(spreadsheetId, groups)
+            setupSpreadsheetSheetsOptimized(spreadsheetId, groups, studentsMap)
             logger.debug("Successfully configured spreadsheet $spreadsheetId")
         } catch (e: Exception) {
             logger.error("Error setting up spreadsheet, attempting to delete...", e)
@@ -149,24 +162,23 @@ class TableService(
         return spreadsheetId
     }
 
-    private fun setupSpreadsheetSheets(spreadsheetId: String, groups: List<String>) {
+    private fun setupSpreadsheetSheetsOptimized(
+        spreadsheetId: String,
+        groups: List<String>,
+        studentsMap: Map<String, List<Student>>
+    ) {
         logger.debug("Setting up sheets for spreadsheet $spreadsheetId with groups: $groups")
 
-        // Получаем всех студентов для всех групп через сервис
-        val studentsByGroup = groups.associateWith { group ->
-            studentService.getFormattedStudentNames(group).also {
-                logger.debug("Found ${it.size} students for group $group")
-            }
-        }
-
-        // Собираем все запросы в один пакет
         val batchRequests = mutableListOf<Request>()
 
         groups.forEachIndexed { index, group ->
             try {
                 logger.debug("Processing group $group (index $index)")
 
-                val students = studentsByGroup[group] ?: emptyList()
+                val students = studentsMap[group]?.map {
+                    "${it.surname} ${it.name} ${it.patronymic ?: ""}".trim()
+                } ?: emptyList()
+
                 if (students.isEmpty()) {
                     logger.warn("No students found for group $group, skipping sheet creation")
                     return@forEachIndexed
@@ -185,25 +197,24 @@ class TableService(
             }
         }
 
-        // Выполняем все запросы на создание/переименование листов одним пакетом
         if (batchRequests.isNotEmpty()) {
             sheetsService.spreadsheets().batchUpdate(
                 spreadsheetId,
                 BatchUpdateSpreadsheetRequest().setRequests(batchRequests)
             ).execute()
-            TimeUnit.MILLISECONDS.sleep(API_DELAY_MS)
         }
 
-        // Заполняем данные на листах
         groups.forEachIndexed { index, group ->
-            val students = studentsByGroup[group]
-            if (students != null && students.isNotEmpty()) {
+            val students = studentsMap[group]?.map {
+                "${it.surname} ${it.name} ${it.patronymic ?: ""}".trim()
+            }
+            if (!students.isNullOrEmpty()) {
                 fillSheet(spreadsheetId, index, students)
-                TimeUnit.MILLISECONDS.sleep(API_DELAY_MS)
             }
         }
     }
 
+    // Остальные методы остаются без изменений
     private fun saveTableLink(stream: String, subject: String, url: String) {
         logger.debug("Saving table link for stream $stream and subject $subject")
         tableLinkRepository.save(
@@ -371,8 +382,7 @@ class TableService(
                         RowData().setValues(
                             listOf(
                                 CellData().setUserEnteredValue(
-                                    ExtendedValue().setNumberValue(number.toDouble())
-                                )
+                                    ExtendedValue().setNumberValue(number.toDouble()))
                             )
                         )
                     }
@@ -395,12 +405,11 @@ class TableService(
                         RowData().setValues(
                             listOf(
                                 CellData().setUserEnteredValue(
-                                    ExtendedValue().setStringValue(name)
-                                ).setUserEnteredFormat(
-                                    CellFormat()
-                                        .setHorizontalAlignment("LEFT")
-                                        .setWrapStrategy("WRAP")
-                                )
+                                    ExtendedValue().setStringValue(name))
+                                    .setUserEnteredFormat(
+                                        CellFormat()
+                                            .setHorizontalAlignment("LEFT")
+                                            .setWrapStrategy("WRAP"))
                             )
                         )
                     }
@@ -476,13 +485,12 @@ class TableService(
                     GridCoordinate()
                         .setSheetId(sheetId)
                         .setRowIndex(studentCount + 1)
-                        .setColumnIndex(1) // Changed from 0 to 1 to move to second column
+                        .setColumnIndex(1)
                 )
                 .setRows(
                     listOf(
                         RowData().setValues(
                             listOf(
-                                // Changed "Итого на паре:" to "Итого:" and moved to second column
                                 CellData().setUserEnteredValue(
                                     ExtendedValue().setStringValue("Итого:")
                                 ).setUserEnteredFormat(
@@ -560,7 +568,7 @@ class TableService(
                     )
                     .setProperties(
                         DimensionProperties()
-                            .setPixelSize(300) // Increased from 200 to 250 for better fit
+                            .setPixelSize(300)
                     )
                     .setFields("pixelSize")
             ),

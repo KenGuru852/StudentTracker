@@ -11,4 +11,7 @@ interface ScheduleRepository : JpaRepository<Schedule, Long> {
 
     @Query("SELECT DISTINCT s.subject FROM Schedule s WHERE s.groupName IN :groupNames")
     fun findDistinctSubjectsByGroups(groupNames: List<String>): List<String>
+
+    @Query("SELECT s FROM Schedule s")
+    override fun findAll(): List<Schedule>
 }

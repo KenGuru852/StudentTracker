@@ -29,6 +29,7 @@ data class Schedule(
     @Column(nullable = false)
     val subject: String
 ) {
+    constructor() : this(null, LocalTime.now(), DayOfWeek.FRIDAY, "", "", "")
     companion object {
 
         private val timeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy H:mm:ss")

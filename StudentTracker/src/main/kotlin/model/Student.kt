@@ -1,6 +1,7 @@
 package org.example.model
 
 import jakarta.persistence.*
+import java.time.LocalDateTime
 
 @Entity
 @Table(name = "students")
@@ -24,4 +25,6 @@ data class Student(
     @ManyToOne
     @JoinColumn(name = "group_stream_id", nullable = false)
     val groupStream: GroupStream
-)
+) {
+    constructor() : this(null, "", "", "", "", GroupStream(null, "", ""))
+}

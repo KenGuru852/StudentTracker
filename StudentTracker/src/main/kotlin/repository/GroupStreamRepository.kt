@@ -15,4 +15,10 @@ interface GroupStreamRepository : JpaRepository<GroupStream, Long> {
 
     @Query("SELECT gs.groupName FROM GroupStream gs WHERE gs.streamName = :streamName")
     fun findGroupNamesByStreamName(streamName: String): List<String>
+
+    @Query("SELECT gs FROM GroupStream gs")
+    override fun findAll(): List<GroupStream>
+
+    @Query("SELECT DISTINCT gs.streamName FROM GroupStream gs")
+    fun findAllStreamNamesDistinct(): List<String>
 }

@@ -25,16 +25,17 @@ dependencies {
     testImplementation(kotlin("test"))
 
     implementation("com.google.apis:google-api-services-sheets:v4-rev20250509-2.0.0")
-
     implementation("com.fasterxml.jackson.core:jackson-databind:2.15.0")
-
     implementation("com.google.api-client:google-api-client:2.7.2")
-
     implementation("com.google.apis:google-api-services-drive:v3-rev20250511-2.0.0")
-
     implementation("org.springframework.boot:spring-boot-starter-cache")
     implementation("com.github.ben-manes.caffeine:caffeine")
 
+    // Add the javax.annotation dependency
+    implementation("javax.annotation:javax.annotation-api:1.3.2")
+
+    implementation("org.apache.poi:poi:5.2.3")
+    implementation("org.apache.poi:poi-ooxml:5.2.3")
 }
 
 tasks.test {

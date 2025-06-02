@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.multipart.MultipartFile
 import java.io.ByteArrayInputStream
+import kotlin.jvm.optionals.toList
 
 @Service
 class StudentService(
@@ -20,17 +21,17 @@ class StudentService(
 
     @Transactional
     fun processStudentsExcelFile(file: MultipartFile): List<Student> {
+        if (studentRepository.findAll().isNotEmpty()){
+            return studentRepository.findById(1).toList()
+        }
+
         val students = mutableListOf<Student>()
         val groupStreamCache = mutableMapOf<String, GroupStream>()
 
         try {
-
             val workbook = XSSFWorkbook(ByteArrayInputStream(file.bytes))
-
             processExcelSheets(workbook, groupStreamCache, students)
-
             studentRepository.saveAll(students)
-
         } catch (e: Exception) {
             throw ExcelProcessingException("Ошибка обработки Excel файла", e)
         }
@@ -45,7 +46,6 @@ class StudentService(
     ) {
         for (sheetIndex in 0 until workbook.numberOfSheets) {
             val sheet = workbook.getSheetAt(sheetIndex)
-
             for (rowIndex in 1..sheet.lastRowNum) {
                 val row: Row = sheet.getRow(rowIndex) ?: continue
                 processStudentRow(row, groupStreamCache, students)
@@ -66,7 +66,6 @@ class StudentService(
         val email = row.getCell(6)?.toString()?.trim() ?: return
 
         val groupStreamKey = "$group-$stream"
-
         val groupStream = groupStreamCache.getOrPut(groupStreamKey) {
             groupStreamRepository.findByGroupName(group) ?: groupStreamRepository.save(
                 GroupStream(
@@ -91,6 +90,10 @@ class StudentService(
     fun getFormattedStudentNames(group: String): List<String> {
         return studentRepository.findByGroupStreamGroupName(group)
             .map { "${it.surname} ${it.name} ${it.patronymic ?: ""}".trim() }
+    }
+
+    fun getAllStudents(): List<Student> {
+        return studentRepository.findAll()
     }
 }
 

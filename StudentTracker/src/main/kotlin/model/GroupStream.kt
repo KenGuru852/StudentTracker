@@ -15,4 +15,6 @@ data class GroupStream(
 
     @Column(name = "stream_name", nullable = false)
     val streamName: String
-)
+) {
+    constructor() : this(null, "", "")
+}
