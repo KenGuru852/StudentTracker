@@ -6,15 +6,15 @@
     <link rel="stylesheet" href="/styles/main.css">
 </head>
 <body>
-    <h1>Генератор таблиц</h1>
+    <h1>Генератор Google-таблиц успеваемости студентов</h1>
     
     <div class="file-inputs">
         <div class="file-input">
-            <label for="jsonFile">JSON файл:</label>
+            <label for="jsonFile">Расписание занятий (JSON):</label>
             <input type="file" id="jsonFile" accept=".json">
         </div>
         <div class="file-input">
-            <label for="xlsxFile">Excel файл (XLSX):</label>
+            <label for="xlsxFile">База данных студентов (Excel):</label>
             <input type="file" id="xlsxFile" accept=".xlsx,.xls">
         </div>
     </div>
@@ -32,7 +32,6 @@
             <label for="subjectFilter">Фильтр по предмету:</label>
             <input type="text" id="subjectFilter" placeholder="Введите часть названия предмета">
         </div>
-        <button id="applyFiltersBtn">Применить фильтры</button>
     </div>
     
     <div id="result"></div>

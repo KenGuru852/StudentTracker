@@ -12,7 +12,10 @@ const PORT = 3000;
 const BACKEND_URL = 'http://backend:8080'; 
 
 app.use(cors()); // Используем cors
-app.use(fileUpload());
+app.use(fileUpload({
+  limits: { fileSize: 10 * 1024 * 1024 * 1024 }, // 100MB
+  abortOnLimit: true
+}));
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/styles', express.static(path.join(__dirname, 'public', 'styles')));
