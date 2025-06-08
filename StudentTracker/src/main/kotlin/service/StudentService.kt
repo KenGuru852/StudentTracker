@@ -85,16 +85,6 @@ class StudentService(
             )
         )
     }
-
-    @Cacheable("studentsCache", key = "#group")
-    fun getFormattedStudentNames(group: String): List<String> {
-        return studentRepository.findByGroupStreamGroupName(group)
-            .map { "${it.surname} ${it.name} ${it.patronymic ?: ""}".trim() }
-    }
-
-    fun getAllStudents(): List<Student> {
-        return studentRepository.findAll()
-    }
 }
 
 class ExcelProcessingException(message: String, cause: Throwable?) :

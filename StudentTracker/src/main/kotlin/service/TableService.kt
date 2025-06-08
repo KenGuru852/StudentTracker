@@ -28,15 +28,12 @@ class TableService(
     private val studentRepository: StudentRepository,
     private val scheduleRepository: ScheduleRepository,
     private val groupStreamRepository: GroupStreamRepository,
-    private val tableLinkRepository: TableLinkRepository,
-    private val teacherRepository: TeacherRepository,
-    private val studentService: StudentService
+    private val tableLinkRepository: TableLinkRepository
 ) {
     companion object {
         private const val APPLICATION_NAME = "Student Attendance Tracker"
         private const val LESSONS_COUNT = 17
         private const val BASE_SHEETS_URL = "https://docs.google.com/spreadsheets/d/"
-        private const val API_DELAY_MS = 1500L
         private val logger = LoggerFactory.getLogger(TableService::class.java)
     }
 
@@ -48,14 +45,12 @@ class TableService(
         logger.info("Starting creation of attendance sheets for all streams")
 
         try {
-            // Получаем все данные одним запросом
             val allStreams = groupStreamRepository.findAll()
             val allGroups = allStreams.map { it.groupName }
             val allSchedules = scheduleRepository.findByGroupNameIn(allGroups)
             val allStudents = studentRepository.findAll()
             val existingLinks = tableLinkRepository.findAll()
 
-            // Группируем данные для быстрого доступа
             val streamsMap = allStreams.groupBy { it.streamName }
             val schedulesMap = allSchedules.groupBy { it.groupName }
             val studentsMap = allStudents.groupBy { it.groupStream.groupName }
@@ -115,7 +110,6 @@ class TableService(
                     val spreadsheetId = createNewSpreadsheetOptimized(subject, stream, groupsInStream, studentsMap)
                     val url = "$BASE_SHEETS_URL$spreadsheetId"
 
-                    // Получаем имя преподавателя для этого предмета
                     val teacherName = schedulesMap[groupsInStream.first()]?.first { it.subject == subject }?.teacher?.fullName
                         ?: "Неизвестный преподаватель"
 
@@ -141,7 +135,6 @@ class TableService(
     ): String {
         logger.debug("Creating new spreadsheet for subject $subject and stream $stream")
 
-        // Получаем emails всех преподавателей, связанных с этим потоком
         val teacherEmails = groups.flatMap { group ->
             scheduleRepository.findByGroupName(group).map { it.teacher.email }
         }.toSet()
@@ -223,7 +216,6 @@ class TableService(
         }
     }
 
-    // Остальные методы остаются без изменений
     private fun saveTableLink(stream: String, subject: String, teacherName: String, url: String) {
         logger.debug("Saving table link for stream $stream, subject $subject and teacher $teacherName")
         tableLinkRepository.save(
@@ -279,7 +271,6 @@ class TableService(
     private fun setSpreadsheetPermissions(spreadsheetId: String, teacherEmails: Set<String>) {
         logger.debug("Setting permissions for spreadsheet $spreadsheetId")
 
-        // Даем доступ на редактирование преподавателям
         teacherEmails.forEach { email ->
             driveService.permissions().create(spreadsheetId,
                 Permission()
@@ -289,7 +280,6 @@ class TableService(
             ).execute()
         }
 
-        // Даем доступ на чтение всем (студентам)
         driveService.permissions().create(spreadsheetId,
             Permission()
                 .setType("anyone")

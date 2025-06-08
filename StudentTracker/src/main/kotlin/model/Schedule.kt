@@ -48,7 +48,7 @@ data class Schedule(
             val timeString = json["ВремяНачала"] as String
             val dayString = (json["ДеньНедели"] as String).lowercase()
             val teacherName = json["ФизическоеЛицо"] as String
-            val teacherEmail = "student_tracker_teacher_test@mail.ru" // Default email
+            val teacherEmail = "student_tracker_teacher_test@mail.ru"
 
             val teacher = teacherRepository.findByFullName(teacherName) ?:
             teacherRepository.save(Teacher(fullName = teacherName, email = teacherEmail))

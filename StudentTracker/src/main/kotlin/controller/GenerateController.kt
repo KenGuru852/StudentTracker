@@ -35,19 +35,14 @@ class GenerateController(
         @RequestParam("teachersFile") teachersFile: MultipartFile
     ): ResponseEntity<Map<String, List<String>>> {
         return try {
-            // 1. Сначала загружаем преподавателей
             val teachers = teacherService.processTeachersJsonFile(teachersFile)
 
-            // 2. Затем студентов
             val students = studentService.processStudentsExcelFile(studentsExcelFile)
 
-            // 3. Затем расписание (которое ссылается на преподавателей)
             val schedules = scheduleService.processScheduleJsonFile(scheduleJsonFile)
 
-            // 4. Генерируем таблицы
             val allTables = tableService.createAttendanceSheetsForAllStreams()
 
-            // Преобразуем в Map<String, List<String>> для JSON
             val result = allTables.mapValues { entry ->
                 entry.value.takeIf { it.isNotEmpty() } ?: listOf("No link generated")
             }

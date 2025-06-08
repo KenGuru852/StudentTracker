@@ -7,5 +7,4 @@ import org.springframework.stereotype.Repository
 @Repository
 interface TeacherRepository : JpaRepository<Teacher, Long> {
     fun findByFullName(fullName: String): Teacher?
-    fun findByEmail(email: String): Teacher?
 }
