@@ -25,7 +25,7 @@ def extract_teachers(input_file, output_file):
         teachers_list = [
             {
                 "full_name": teacher,
-                "email": "student_tracker_teacher_test@mail.ru",
+                "email": "studenttrackerteachertest@gmail.com",
             }
             for teacher in sorted_teachers
         ]

@@ -137,6 +137,11 @@ class TableService(
     ): String {
         logger.debug("Creating new spreadsheet for subject $subject and stream $stream")
 
+        // Получаем emails всех преподавателей, связанных с этим потоком
+        val teacherEmails = groups.flatMap { group ->
+            scheduleRepository.findByGroupName(group).map { it.teacher.email }
+        }.toSet()
+
         val spreadsheet = Spreadsheet()
             .setProperties(SpreadsheetProperties().setTitle("$subject$stream"))
 
@@ -145,8 +150,7 @@ class TableService(
         logger.debug("Created spreadsheet with ID: $spreadsheetId")
 
         try {
-            setSpreadsheetPermissions(spreadsheetId)
-
+            setSpreadsheetPermissions(spreadsheetId, teacherEmails)
             setupSpreadsheetSheetsOptimized(spreadsheetId, groups, studentsMap)
             logger.debug("Successfully configured spreadsheet $spreadsheetId")
         } catch (e: Exception) {
@@ -267,10 +271,25 @@ class TableService(
             .also { logger.debug("Drive service initialized successfully") }
     }
 
-    private fun setSpreadsheetPermissions(spreadsheetId: String) {
+    private fun setSpreadsheetPermissions(spreadsheetId: String, teacherEmails: Set<String>) {
         logger.debug("Setting permissions for spreadsheet $spreadsheetId")
+
+        // Даем доступ на редактирование преподавателям
+        teacherEmails.forEach { email ->
+            driveService.permissions().create(spreadsheetId,
+                Permission()
+                    .setType("user")
+                    .setRole("writer")
+                    .setEmailAddress(email)
+            ).execute()
+        }
+
+        // Даем доступ на чтение всем (студентам)
         driveService.permissions().create(spreadsheetId,
-            Permission().setType("anyone").setRole("writer").setAllowFileDiscovery(false)
+            Permission()
+                .setType("anyone")
+                .setRole("reader")
+                .setAllowFileDiscovery(false)
         ).execute()
     }
 

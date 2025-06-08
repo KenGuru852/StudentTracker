@@ -14,4 +14,6 @@ interface ScheduleRepository : JpaRepository<Schedule, Long> {
 
     @Query("SELECT s FROM Schedule s")
     override fun findAll(): List<Schedule>
+
+    fun findByGroupName(groupName: String): List<Schedule>
 }
