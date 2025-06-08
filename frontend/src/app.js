@@ -4,16 +4,16 @@ const fileUpload = require('express-fileupload');
 const FormData = require('form-data');
 const fetch = (...args) =>
     import('node-fetch').then(({ default: fetch }) => fetch(...args));
-const cors = require('cors'); // Импортируем cors
+const cors = require('cors');
 
 const app = express();
 const PORT = 3000;
 
 const BACKEND_URL = 'http://backend:8080'; 
 
-app.use(cors()); // Используем cors
+app.use(cors());
 app.use(fileUpload({
-  limits: { fileSize: 10 * 1024 * 1024 * 1024 }, // 100MB
+  limits: { fileSize: 10 * 1024 * 1024 * 1024 }, 
   abortOnLimit: true
 }));
 
@@ -66,18 +66,18 @@ app.post('/api/clearAllData', async (req, res) => {
 
 app.post('/api/generateTables', async (req, res) => {
     try {
-        if (!req.files?.jsonFile || !req.files?.xlsxFile || !req.files?.teachersFile) {
+        if (!req.files?.scheduleFile || !req.files?.studentFile || !req.files?.teachersFile) {
             return res.status(400).send('Необходимо загрузить все три файла');
         }
 
         const formData = new FormData();
-        formData.append('jsonFile', req.files.jsonFile.data, {
-            filename: req.files.jsonFile.name,
-            contentType: req.files.jsonFile.mimetype
+        formData.append('scheduleFile', req.files.scheduleFile.data, {
+            filename: req.files.scheduleFile.name,
+            contentType: req.files.scheduleFile.mimetype
         });
-        formData.append('xlsxFile', req.files.xlsxFile.data, {
-            filename: req.files.xlsxFile.name,
-            contentType: req.files.xlsxFile.mimetype
+        formData.append('studentFile', req.files.studentFile.data, {
+            filename: req.files.studentFile.name,
+            contentType: req.files.studentFile.mimetype
         });
         formData.append('teachersFile', req.files.teachersFile.data, {
             filename: req.files.teachersFile.name,

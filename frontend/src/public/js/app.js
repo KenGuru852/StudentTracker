@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const generateBtn = document.getElementById('generateBtn');
-    const jsonFileInput = document.getElementById('jsonFile');
-    const xlsxFileInput = document.getElementById('xlsxFile');
+    const scheduleFileInput = document.getElementById('scheduleFile');
+    const studentFileInput = document.getElementById('studentFile');
     const teachersFileInput = document.getElementById('teachersFile');
     const resultDiv = document.getElementById('result');
     const streamFilter = document.getElementById('streamFilter');
@@ -11,7 +11,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const filteredResultsDiv = document.getElementById('filteredResults');
     const clearDataBtn = document.getElementById('clearDataBtn');
 
-    // Загружаем таблицы при старте (если они есть)
     displayFilteredTables();
 
     clearDataBtn.addEventListener('click', async () => {
@@ -40,18 +39,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     generateBtn.addEventListener('click', async () => {
-        const jsonFile = jsonFileInput.files[0];
-        const xlsxFile = xlsxFileInput.files[0];
+        const scheduleFile = scheduleFileInput.files[0];
+        const studentFile = studentFileInput.files[0];
         const teachersFile = teachersFileInput.files[0];
         
-        if (!jsonFile || !xlsxFile || !teachersFile) {
+        if (!scheduleFile || !studentFile || !teachersFile) {
             resultDiv.textContent = 'Пожалуйста, выберите все три файла';
             return;
         }
 
         const formData = new FormData();
-        formData.append('jsonFile', jsonFile);
-        formData.append('xlsxFile', xlsxFile);
+        formData.append('scheduleFile', scheduleFile);
+        formData.append('studentFile', studentFile);
         formData.append('teachersFile', teachersFile);
 
         try {

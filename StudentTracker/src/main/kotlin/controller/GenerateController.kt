@@ -25,8 +25,8 @@ class GenerateController(
 
     @PostMapping("/generateTables", consumes = ["multipart/form-data"])
     fun generateTables(
-        @RequestParam("jsonFile") scheduleJsonFile: MultipartFile,
-        @RequestParam("xlsxFile") studentsExcelFile: MultipartFile,
+        @RequestParam("scheduleFile") scheduleJsonFile: MultipartFile,
+        @RequestParam("studentFile") studentsExcelFile: MultipartFile,
         @RequestParam("teachersFile") teachersFile: MultipartFile
     ): ResponseEntity<Map<String, List<String>>> {
         return try {
