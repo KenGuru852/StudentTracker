@@ -17,12 +17,15 @@
             <label for="xlsxFile">База данных студентов (Excel):</label>
             <input type="file" id="xlsxFile" accept=".xlsx,.xls">
         </div>
+        <div class="file-input">
+            <label for="teachersFile">База преподавателей (JSON):</label>
+            <input type="file" id="teachersFile" accept=".json">
+        </div>
     </div>
     
     <button id="generateBtn">Генерировать</button>
     <button id="clearDataBtn" class="danger-btn">Очистить данные</button>
     
-    <!-- Добавляем блок с фильтрами -->
     <div class="filters" id="filters">
         <div class="filter">
             <label for="streamFilter">Фильтр по потоку:</label>

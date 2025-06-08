@@ -13,7 +13,7 @@ def filter_ip_is_groups(input_file, output_file):
         # Фильтрация данных (предполагаем, что это список объектов)
         filtered_data = [item for item in data 
                         if isinstance(item.get("Группа"), str) and 
-                        (item["Группа"].startswith("ИП-") or item["Группа"].startswith("ИС-"))]
+                        (item["Группа"].startswith("ИП-1") )]
         
         # Сохранение отфильтрованных данных в новый файл
         with open(output_file, 'w', encoding='utf-8') as f:

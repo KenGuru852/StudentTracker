@@ -1,9 +1,8 @@
 package org.example.service
 
-import org.example.repository.GroupStreamRepository
-import org.example.repository.ScheduleRepository
-import org.example.repository.StudentRepository
-import org.example.repository.TableLinkRepository
+import org.example.model.TableLink
+import org.example.repository.*
+import org.example.service.TableService.Companion
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -15,6 +14,7 @@ class DatabaseService(
     private val studentRepository: StudentRepository,
     private val groupStreamRepository: GroupStreamRepository,
     private val tableLinkRepository: TableLinkRepository,
+    private val teacherRepository: TeacherRepository,
     private val logger: Logger? = LoggerFactory.getLogger(TableService::class.java)
 ) {
     @Transactional
@@ -22,23 +22,53 @@ class DatabaseService(
         return try {
             logger!!.info("Starting data cleanup process")
 
-            // 1. Сначала удаляем табличные ссылки (нет зависимостей)
             tableLinkRepository.deleteAllInBatch()
             logger.info("Cleared table_links")
 
-            // 2. Затем студентов (зависит от group_streams)
             studentRepository.deleteAllInBatch()
             logger.info("Cleared students")
 
-            // 3. Затем расписание (зависит от group_streams через group_name)
             scheduleRepository.deleteAllInBatch()
             logger.info("Cleared schedule")
 
-            // 4. В конце группы (нет зависимостей, но на них ссылаются другие таблицы)
+            teacherRepository.deleteAllInBatch()
+            logger.info("Cleared teachers")
+
             groupStreamRepository.deleteAllInBatch()
             logger.info("Cleared group_streams")
         } catch (e: Exception) {
             throw DatabaseProcessingException("Ошибка удаления данных: ${e.message}", e)
+        }
+    }
+
+    fun getFilteredTableLinks(streamName: String?, subject: String?): List<TableLink> {
+        logger!!.info("Filtering table links. Stream: '$streamName', Subject: '$subject'")
+
+        return try {
+            val result = when {
+                streamName != null && subject != null -> {
+                    logger.debug("Both filters present")
+                    tableLinkRepository.findByStreamNameContainingIgnoreCaseAndSubjectContainingIgnoreCase(streamName, subject)
+                }
+                streamName != null -> {
+                    logger.debug("Only stream filter present")
+                    tableLinkRepository.findByStreamNameContainingIgnoreCase(streamName)
+                }
+                subject != null -> {
+                    logger.debug("Only subject filter present")
+                    tableLinkRepository.findBySubjectContainingIgnoreCase(subject)
+                }
+                else -> {
+                    logger.debug("No filters, returning all")
+                    tableLinkRepository.findAll()
+                }
+            }
+
+            logger.info("Found ${result.size} matching table links")
+            result
+        } catch (e: Exception) {
+            logger.error("Error in getFilteredTableLinks", e)
+            throw e
         }
     }
 

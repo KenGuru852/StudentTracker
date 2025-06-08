@@ -24,7 +24,7 @@
                 <constraints nullable="false"/>
             </column>
 
-            <column name="teacher" type="text">
+            <column name="teacher_id" type="BIGINT">
                 <constraints nullable="false"/>
             </column>
 

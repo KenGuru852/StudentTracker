@@ -32,10 +32,7 @@ def generate_english_email(last_name: str, first_name: str, middle_name: str) ->
 
 # Группы, которые нужно создать
 groups = (
-    [f"ИП-11{i}" for i in range(1, 8)] +  # ИП-111, ИП-112, ..., ИП-117
-    [f"ИП-01{i}" for i in range(1, 8)] +  # ИП-011, ИП-012, ..., ИП-017
-    [f"ИС-14{i}" for i in range(1, 3)] +  # ИС-141, ИС-142
-    [f"ИС-04{i}" for i in range(1, 3)]    # ИС-041, ИС-042
+    [f"ИП-11{i}" for i in range(1, 8)] # ИП-111, ИП-112, ..., ИП-117
 )
 
 for group in groups:

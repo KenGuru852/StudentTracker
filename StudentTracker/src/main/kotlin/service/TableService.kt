@@ -29,6 +29,7 @@ class TableService(
     private val scheduleRepository: ScheduleRepository,
     private val groupStreamRepository: GroupStreamRepository,
     private val tableLinkRepository: TableLinkRepository,
+    private val teacherRepository: TeacherRepository,
     private val studentService: StudentService
 ) {
     companion object {
@@ -588,37 +589,6 @@ class TableService(
                     .setFields("pixelSize")
             )
         )
-    }
-
-    fun getFilteredTableLinks(streamName: String?, subject: String?): List<TableLink> {
-        logger.info("Filtering table links. Stream: '$streamName', Subject: '$subject'")
-
-        return try {
-            val result = when {
-                streamName != null && subject != null -> {
-                    logger.debug("Both filters present")
-                    tableLinkRepository.findByStreamNameContainingIgnoreCaseAndSubjectContainingIgnoreCase(streamName, subject)
-                }
-                streamName != null -> {
-                    logger.debug("Only stream filter present")
-                    tableLinkRepository.findByStreamNameContainingIgnoreCase(streamName)
-                }
-                subject != null -> {
-                    logger.debug("Only subject filter present")
-                    tableLinkRepository.findBySubjectContainingIgnoreCase(subject)
-                }
-                else -> {
-                    logger.debug("No filters, returning all")
-                    tableLinkRepository.findAll()
-                }
-            }
-
-            logger.info("Found ${result.size} matching table links")
-            result
-        } catch (e: Exception) {
-            logger.error("Error in getFilteredTableLinks", e)
-            throw e
-        }
     }
 }
 

@@ -8,6 +8,7 @@ import org.example.service.DatabaseService
 import org.example.service.ScheduleService
 import org.example.service.StudentService
 import org.example.service.TableService
+import org.example.service.TeacherService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -23,18 +24,27 @@ class GenerateController(
     private val scheduleService: ScheduleService,
     private val tableService: TableService,
     private val databaseService: DatabaseService,
+    private val teacherService: TeacherService,
     private val logger: Logger? = LoggerFactory.getLogger(TableService::class.java)
 ) {
 
     @PostMapping("/generateTables", consumes = ["multipart/form-data"])
     fun generateTables(
         @RequestParam("jsonFile") scheduleJsonFile: MultipartFile,
-        @RequestParam("xlsxFile") studentsExcelFile: MultipartFile
+        @RequestParam("xlsxFile") studentsExcelFile: MultipartFile,
+        @RequestParam("teachersFile") teachersFile: MultipartFile
     ): ResponseEntity<Map<String, List<String>>> {
         return try {
+            // 1. Сначала загружаем преподавателей
+            val teachers = teacherService.processTeachersJsonFile(teachersFile)
+
+            // 2. Затем студентов
             val students = studentService.processStudentsExcelFile(studentsExcelFile)
+
+            // 3. Затем расписание (которое ссылается на преподавателей)
             val schedules = scheduleService.processScheduleJsonFile(scheduleJsonFile)
 
+            // 4. Генерируем таблицы
             val allTables = tableService.createAttendanceSheetsForAllStreams()
 
             // Преобразуем в Map<String, List<String>> для JSON
@@ -55,7 +65,7 @@ class GenerateController(
         @RequestParam(required = false) subject: String?
     ): ResponseEntity<List<Map<String, String>>> {
         return try {
-            val links = tableService.getFilteredTableLinks(stream, subject)
+            val links = databaseService.getFilteredTableLinks(stream, subject)
                 .map {
                     mapOf(
                         "stream" to it.streamName,

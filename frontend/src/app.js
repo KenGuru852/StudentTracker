@@ -65,8 +65,8 @@ app.post('/api/clearAllData', async (req, res) => {
 
 app.post('/api/generateTables', async (req, res) => {
     try {
-        if (!req.files?.jsonFile || !req.files?.xlsxFile) {
-            return res.status(400).send('Необходимо загрузить оба файла');
+        if (!req.files?.jsonFile || !req.files?.xlsxFile || !req.files?.teachersFile) {
+            return res.status(400).send('Необходимо загрузить все три файла');
         }
 
         const formData = new FormData();
@@ -78,6 +78,10 @@ app.post('/api/generateTables', async (req, res) => {
             filename: req.files.xlsxFile.name,
             contentType: req.files.xlsxFile.mimetype
         });
+        formData.append('teachersFile', req.files.teachersFile.data, {
+            filename: req.files.teachersFile.name,
+            contentType: req.files.teachersFile.mimetype
+        });
 
         const response = await fetch(`${BACKEND_URL}/api/generateTables`, {
             method: 'POST',
@@ -85,13 +89,10 @@ app.post('/api/generateTables', async (req, res) => {
             headers: formData.getHeaders() 
         });
 
-        res.status(response.status).send(await response.text());
+        res.status(response.status).json(await response.json());
     } catch (error) {
-        console.error('Backend connection error:', {
-            message: error.message,
-            url: BACKEND_URL
-        });
-        res.status(502).send('Ошибка соединения с бэкендом');
+        console.error('Backend connection error:', error);
+        res.status(502).json({ error: 'Ошибка соединения с бэкендом' });
     }
 });
 
