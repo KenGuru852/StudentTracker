@@ -2,7 +2,6 @@ package org.example.service
 
 import org.example.model.TableLink
 import org.example.repository.*
-import org.example.service.TableService.Companion
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -49,35 +48,46 @@ class DatabaseService(
                 streamName != null && subject != null && teacherName != null -> {
                     logger.debug("All filters present")
                     tableLinkRepository.findByStreamNameContainingIgnoreCaseAndSubjectContainingIgnoreCaseAndTeacherNameContainingIgnoreCase(
-                        streamName, subject, teacherName)
+                        streamName, subject, teacherName
+                    )
                 }
+
                 streamName != null && subject != null -> {
                     logger.debug("Stream and subject filters present")
                     tableLinkRepository.findByStreamNameContainingIgnoreCaseAndSubjectContainingIgnoreCase(
-                        streamName, subject)
+                        streamName, subject
+                    )
                 }
+
                 streamName != null && teacherName != null -> {
                     logger.debug("Stream and teacher filters present")
                     tableLinkRepository.findByStreamNameContainingIgnoreCaseAndTeacherNameContainingIgnoreCase(
-                        streamName, teacherName)
+                        streamName, teacherName
+                    )
                 }
+
                 subject != null && teacherName != null -> {
                     logger.debug("Subject and teacher filters present")
                     tableLinkRepository.findBySubjectContainingIgnoreCaseAndTeacherNameContainingIgnoreCase(
-                        subject, teacherName)
+                        subject, teacherName
+                    )
                 }
+
                 streamName != null -> {
                     logger.debug("Only stream filter present")
                     tableLinkRepository.findByStreamNameContainingIgnoreCase(streamName)
                 }
+
                 subject != null -> {
                     logger.debug("Only subject filter present")
                     tableLinkRepository.findBySubjectContainingIgnoreCase(subject)
                 }
+
                 teacherName != null -> {
                     logger.debug("Only teacher filter present")
                     tableLinkRepository.findByTeacherNameContainingIgnoreCase(teacherName)
                 }
+
                 else -> {
                     logger.debug("No filters, returning all")
                     tableLinkRepository.findAll()

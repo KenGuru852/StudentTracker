@@ -7,8 +7,6 @@ import org.springframework.stereotype.Repository
 
 @Repository
 interface StudentRepository : JpaRepository<Student, Long> {
-    fun findByGroupStreamGroupName(groupName: String): List<Student>
-
     @Query("SELECT s FROM Student s")
     override fun findAll(): List<Student>
 }

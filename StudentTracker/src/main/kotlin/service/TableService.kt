@@ -58,7 +58,7 @@ class TableService(
 
             streamsMap.keys.forEachIndexed { index, stream ->
                 logger.info("Processing stream: $stream")
-                processStreamOptimized(stream, streamsMap, schedulesMap, studentsMap, existingLinksMap, result)
+                processStream(stream, streamsMap, schedulesMap, studentsMap, existingLinksMap, result)
             }
 
             logger.info("Successfully created ${result.size} spreadsheets")
@@ -70,7 +70,7 @@ class TableService(
         return result
     }
 
-    private fun processStreamOptimized(
+    private fun processStream(
         stream: String,
         streamsMap: Map<String, List<GroupStream>>,
         schedulesMap: Map<String, List<Schedule>>,
@@ -107,18 +107,22 @@ class TableService(
                     }
 
                     logger.info("Creating new spreadsheet for $spreadsheetName")
-                    val spreadsheetId = createNewSpreadsheetOptimized(subject, stream, groupsInStream, studentsMap)
+                    val spreadsheetId = createNewSpreadsheet(subject, stream, groupsInStream, studentsMap)
                     val url = "$BASE_SHEETS_URL$spreadsheetId"
 
-                    val teacherName = schedulesMap[groupsInStream.first()]?.first { it.subject == subject }?.teacher?.fullName
-                        ?: "Неизвестный преподаватель"
+                    val teacherName =
+                        schedulesMap[groupsInStream.first()]?.first { it.subject == subject }?.teacher?.fullName
+                            ?: "Неизвестный преподаватель"
 
                     saveTableLink(stream, subject, teacherName, url)
                     result[spreadsheetName] = listOf(url)
                     logger.info("Successfully created spreadsheet for $spreadsheetName with URL: $url")
                 } catch (e: Exception) {
                     logger.error("Error processing subject $subject for stream $stream: ${e.message}", e)
-                    throw TableGenerationException("Ошибка при обработке потока $stream и предмета $subject: ${e.message}", e)
+                    throw TableGenerationException(
+                        "Ошибка при обработке потока $stream и предмета $subject: ${e.message}",
+                        e
+                    )
                 }
             }
         } catch (e: Exception) {
@@ -127,7 +131,7 @@ class TableService(
         }
     }
 
-    private fun createNewSpreadsheetOptimized(
+    private fun createNewSpreadsheet(
         subject: String,
         stream: String,
         groups: List<String>,
@@ -148,7 +152,7 @@ class TableService(
 
         try {
             setSpreadsheetPermissions(spreadsheetId, teacherEmails)
-            setupSpreadsheetSheetsOptimized(spreadsheetId, groups, studentsMap)
+            setupSpreadsheetSheets(spreadsheetId, groups, studentsMap)
             logger.debug("Successfully configured spreadsheet $spreadsheetId")
         } catch (e: Exception) {
             logger.error("Error setting up spreadsheet, attempting to delete...", e)
@@ -164,7 +168,7 @@ class TableService(
         return spreadsheetId
     }
 
-    private fun setupSpreadsheetSheetsOptimized(
+    private fun setupSpreadsheetSheets(
         spreadsheetId: String,
         groups: List<String>,
         studentsMap: Map<String, List<Student>>
@@ -233,10 +237,12 @@ class TableService(
         logger.debug("Initializing Sheets service")
         return try {
             val credentials = GoogleCredentials.fromStream(credentialsResource.inputStream)
-                .createScoped(listOf(
-                    "https://www.googleapis.com/auth/spreadsheets",
-                    "https://www.googleapis.com/auth/drive"
-                ))
+                .createScoped(
+                    listOf(
+                        "https://www.googleapis.com/auth/spreadsheets",
+                        "https://www.googleapis.com/auth/drive"
+                    )
+                )
 
             Sheets.Builder(
                 GoogleNetHttpTransport.newTrustedTransport(),
@@ -254,15 +260,18 @@ class TableService(
     private fun initDriveService(): Drive {
         logger.debug("Initializing Drive service")
         val credentials = GoogleCredentials.fromStream(credentialsResource.inputStream)
-            .createScoped(listOf(
-                "https://www.googleapis.com/auth/drive",
-                "https://www.googleapis.com/auth/spreadsheets"
-            ))
+            .createScoped(
+                listOf(
+                    "https://www.googleapis.com/auth/drive",
+                    "https://www.googleapis.com/auth/spreadsheets"
+                )
+            )
 
         return Drive.Builder(
             GoogleNetHttpTransport.newTrustedTransport(),
             GsonFactory.getDefaultInstance(),
-            HttpCredentialsAdapter(credentials))
+            HttpCredentialsAdapter(credentials)
+        )
             .setApplicationName(APPLICATION_NAME)
             .build()
             .also { logger.debug("Drive service initialized successfully") }
@@ -272,7 +281,8 @@ class TableService(
         logger.debug("Setting permissions for spreadsheet $spreadsheetId")
 
         teacherEmails.forEach { email ->
-            driveService.permissions().create(spreadsheetId,
+            driveService.permissions().create(
+                spreadsheetId,
                 Permission()
                     .setType("user")
                     .setRole("writer")
@@ -280,7 +290,8 @@ class TableService(
             ).execute()
         }
 
-        driveService.permissions().create(spreadsheetId,
+        driveService.permissions().create(
+            spreadsheetId,
             Permission()
                 .setType("anyone")
                 .setRole("reader")
@@ -320,7 +331,8 @@ class TableService(
             addAll(createColumnSizingRequests(sheetId))
         }
 
-        sheetsService.spreadsheets().batchUpdate(spreadsheetId,
+        sheetsService.spreadsheets().batchUpdate(
+            spreadsheetId,
             BatchUpdateSpreadsheetRequest().setRequests(requests)
         ).execute()
     }
@@ -397,7 +409,8 @@ class TableService(
                         RowData().setValues(
                             listOf(
                                 CellData().setUserEnteredValue(
-                                    ExtendedValue().setNumberValue(number.toDouble()))
+                                    ExtendedValue().setNumberValue(number.toDouble())
+                                )
                             )
                         )
                     }
@@ -420,11 +433,13 @@ class TableService(
                         RowData().setValues(
                             listOf(
                                 CellData().setUserEnteredValue(
-                                    ExtendedValue().setStringValue(name))
+                                    ExtendedValue().setStringValue(name)
+                                )
                                     .setUserEnteredFormat(
                                         CellFormat()
                                             .setHorizontalAlignment("LEFT")
-                                            .setWrapStrategy("WRAP"))
+                                            .setWrapStrategy("WRAP")
+                                    )
                             )
                         )
                     }

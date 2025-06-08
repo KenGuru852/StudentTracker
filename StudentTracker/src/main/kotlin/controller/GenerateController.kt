@@ -1,9 +1,5 @@
 package org.example.controller
 
-import org.example.repository.GroupStreamRepository
-import org.example.repository.ScheduleRepository
-import org.example.repository.StudentRepository
-import org.example.repository.TableLinkRepository
 import org.example.service.DatabaseService
 import org.example.service.ScheduleService
 import org.example.service.StudentService
@@ -13,7 +9,6 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 
@@ -35,11 +30,9 @@ class GenerateController(
         @RequestParam("teachersFile") teachersFile: MultipartFile
     ): ResponseEntity<Map<String, List<String>>> {
         return try {
-            val teachers = teacherService.processTeachersJsonFile(teachersFile)
-
-            val students = studentService.processStudentsExcelFile(studentsExcelFile)
-
-            val schedules = scheduleService.processScheduleJsonFile(scheduleJsonFile)
+            teacherService.processTeachersJsonFile(teachersFile)
+            studentService.processStudentsExcelFile(studentsExcelFile)
+            scheduleService.processScheduleJsonFile(scheduleJsonFile)
 
             val allTables = tableService.createAttendanceSheetsForAllStreams()
 
@@ -87,7 +80,7 @@ class GenerateController(
         } catch (e: Exception) {
             logger!!.error("Error clearing data", e)
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body("Ошибка при очистке данных: ${e.message ?: "Unknown error"}")
+                .body("Ошибка при очистке данных: ${e.message ?: "Неизвестная ошибка"}")
         }
     }
 }

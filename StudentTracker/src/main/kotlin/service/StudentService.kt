@@ -6,7 +6,6 @@ import org.example.model.GroupStream
 import org.example.model.Student
 import org.example.repository.GroupStreamRepository
 import org.example.repository.StudentRepository
-import org.springframework.cache.annotation.Cacheable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.multipart.MultipartFile
