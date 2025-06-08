@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultDiv = document.getElementById('result');
     const streamFilter = document.getElementById('streamFilter');
     const subjectFilter = document.getElementById('subjectFilter');
+    const teacherFilter = document.getElementById('teacherFilter');
     const applyFiltersBtn = document.getElementById('applyFiltersBtn');
     const filteredResultsDiv = document.getElementById('filteredResults');
     const clearDataBtn = document.getElementById('clearDataBtn');
@@ -106,34 +107,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function displayFilteredTables() {
-        const streamFilterValue = streamFilter.value.trim();
-        const subjectFilterValue = subjectFilter.value.trim();
+    const streamFilterValue = streamFilter.value.trim();
+    const subjectFilterValue = subjectFilter.value.trim();
+    const teacherFilterValue = teacherFilter.value.trim();
+
+    filteredResultsDiv.innerHTML = 'Загрузка...';
+    
+    try {
+        const params = new URLSearchParams();
+        if (streamFilterValue) params.append('stream', streamFilterValue);
+        if (subjectFilterValue) params.append('subject', subjectFilterValue);
+        if (teacherFilterValue) params.append('teacher', teacherFilterValue);
+
+        const response = await fetch(`/api/getFilteredLinks?${params.toString()}`);
         
-        filteredResultsDiv.innerHTML = 'Загрузка...';
+        if (!response.ok) throw new Error('Ошибка загрузки таблиц');
         
-        try {
-            const params = new URLSearchParams();
-            if (streamFilterValue) params.append('stream', streamFilterValue);
-            if (subjectFilterValue) params.append('subject', subjectFilterValue);
-            
-            const response = await fetch(`/api/getFilteredLinks?${params.toString()}`);
-            
-            if (!response.ok) throw new Error('Ошибка загрузки таблиц');
-            
-            const links = await response.json();
-            filteredResultsDiv.innerHTML = links.length === 0 
-                ? 'Нет таблиц, соответствующих фильтрам' 
-                : links.map(link => `
-                    <div class="table-link">
-                        <strong>${link.stream} - ${link.subject}</strong><br>
-                        <a href="${link.link}" target="_blank">${link.link}</a>
-                    </div>
-                `).join('');
-        } catch (error) {
-            filteredResultsDiv.innerHTML = `Ошибка: ${error.message}`;
-            console.error('Ошибка:', error);
-        }
+        const links = await response.json();
+        filteredResultsDiv.innerHTML = links.length === 0 
+            ? 'Нет таблиц, соответствующих фильтрам' 
+            : links.map(link => `
+                <div class="table-link">
+                    <strong>${link.stream} - ${link.subject}</strong><br>
+                    <span>Преподаватель: ${link.teacher}</span><br>
+                    <a href="${link.link}" target="_blank">${link.link}</a>
+                </div>
+            `).join('');
+    } catch (error) {
+        filteredResultsDiv.innerHTML = `Ошибка: ${error.message}`;
+        console.error('Ошибка:', error);
     }
+}
 
     function debounce(func, timeout = 500) {
         let timer;
@@ -145,5 +149,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     streamFilter.addEventListener('input', debounce(displayFilteredTables));
     subjectFilter.addEventListener('input', debounce(displayFilteredTables));
+    teacherFilter.addEventListener('input', debounce(displayFilteredTables));
     applyFiltersBtn.addEventListener('click', displayFilteredTables);
 });

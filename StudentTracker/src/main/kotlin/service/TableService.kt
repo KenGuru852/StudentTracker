@@ -115,7 +115,11 @@ class TableService(
                     val spreadsheetId = createNewSpreadsheetOptimized(subject, stream, groupsInStream, studentsMap)
                     val url = "$BASE_SHEETS_URL$spreadsheetId"
 
-                    saveTableLink(stream, subject, url)
+                    // Получаем имя преподавателя для этого предмета
+                    val teacherName = schedulesMap[groupsInStream.first()]?.first { it.subject == subject }?.teacher?.fullName
+                        ?: "Неизвестный преподаватель"
+
+                    saveTableLink(stream, subject, teacherName, url)
                     result[spreadsheetName] = listOf(url)
                     logger.info("Successfully created spreadsheet for $spreadsheetName with URL: $url")
                 } catch (e: Exception) {
@@ -220,12 +224,13 @@ class TableService(
     }
 
     // Остальные методы остаются без изменений
-    private fun saveTableLink(stream: String, subject: String, url: String) {
-        logger.debug("Saving table link for stream $stream and subject $subject")
+    private fun saveTableLink(stream: String, subject: String, teacherName: String, url: String) {
+        logger.debug("Saving table link for stream $stream, subject $subject and teacher $teacherName")
         tableLinkRepository.save(
             TableLink(
                 streamName = stream,
                 subject = subject,
+                teacherName = teacherName,
                 link = url,
                 createdAt = LocalDateTime.now()
             )

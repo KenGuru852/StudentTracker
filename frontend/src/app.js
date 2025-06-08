@@ -27,11 +27,12 @@ app.get('/', (req, res) => {
 
 app.get('/api/getFilteredLinks', async (req, res) => {
     try {
-        const { stream, subject } = req.query;
+        const { stream, subject, teacher } = req.query;
         const params = new URLSearchParams();
         if (stream) params.append('stream', stream);
         if (subject) params.append('subject', subject);
-        
+        if (teacher) params.append('teacher', teacher)
+
         const response = await fetch(`${BACKEND_URL}/api/getFilteredLinks?${params}`);
         
         if (!response.ok) {

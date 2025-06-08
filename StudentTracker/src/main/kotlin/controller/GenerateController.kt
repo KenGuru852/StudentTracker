@@ -62,14 +62,16 @@ class GenerateController(
     @GetMapping("/getFilteredLinks", produces = ["application/json"])
     fun getFilteredLinks(
         @RequestParam(required = false) stream: String?,
-        @RequestParam(required = false) subject: String?
+        @RequestParam(required = false) subject: String?,
+        @RequestParam(required = false) teacher: String?
     ): ResponseEntity<List<Map<String, String>>> {
         return try {
-            val links = databaseService.getFilteredTableLinks(stream, subject)
+            val links = databaseService.getFilteredTableLinks(stream, subject, teacher)
                 .map {
                     mapOf(
                         "stream" to it.streamName,
                         "subject" to it.subject,
+                        "teacher" to it.teacherName,
                         "link" to it.link
                     )
                 }

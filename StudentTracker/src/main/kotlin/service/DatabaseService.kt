@@ -41,14 +41,30 @@ class DatabaseService(
         }
     }
 
-    fun getFilteredTableLinks(streamName: String?, subject: String?): List<TableLink> {
-        logger!!.info("Filtering table links. Stream: '$streamName', Subject: '$subject'")
+    fun getFilteredTableLinks(streamName: String?, subject: String?, teacherName: String?): List<TableLink> {
+        logger!!.info("Filtering table links. Stream: '$streamName', Subject: '$subject', Teacher: '$teacherName'")
 
         return try {
             val result = when {
+                streamName != null && subject != null && teacherName != null -> {
+                    logger.debug("All filters present")
+                    tableLinkRepository.findByStreamNameContainingIgnoreCaseAndSubjectContainingIgnoreCaseAndTeacherNameContainingIgnoreCase(
+                        streamName, subject, teacherName)
+                }
                 streamName != null && subject != null -> {
-                    logger.debug("Both filters present")
-                    tableLinkRepository.findByStreamNameContainingIgnoreCaseAndSubjectContainingIgnoreCase(streamName, subject)
+                    logger.debug("Stream and subject filters present")
+                    tableLinkRepository.findByStreamNameContainingIgnoreCaseAndSubjectContainingIgnoreCase(
+                        streamName, subject)
+                }
+                streamName != null && teacherName != null -> {
+                    logger.debug("Stream and teacher filters present")
+                    tableLinkRepository.findByStreamNameContainingIgnoreCaseAndTeacherNameContainingIgnoreCase(
+                        streamName, teacherName)
+                }
+                subject != null && teacherName != null -> {
+                    logger.debug("Subject and teacher filters present")
+                    tableLinkRepository.findBySubjectContainingIgnoreCaseAndTeacherNameContainingIgnoreCase(
+                        subject, teacherName)
                 }
                 streamName != null -> {
                     logger.debug("Only stream filter present")
@@ -57,6 +73,10 @@ class DatabaseService(
                 subject != null -> {
                     logger.debug("Only subject filter present")
                     tableLinkRepository.findBySubjectContainingIgnoreCase(subject)
+                }
+                teacherName != null -> {
+                    logger.debug("Only teacher filter present")
+                    tableLinkRepository.findByTeacherNameContainingIgnoreCase(teacherName)
                 }
                 else -> {
                     logger.debug("No filters, returning all")

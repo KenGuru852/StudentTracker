@@ -19,6 +19,10 @@
                 <constraints nullable="false"/>
             </column>
 
+            <column name="teacher_name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+
             <column name="link" type="VARCHAR(512)">
                 <constraints nullable="false"/>
             </column>
