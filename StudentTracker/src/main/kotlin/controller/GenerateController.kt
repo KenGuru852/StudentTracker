@@ -30,13 +30,11 @@ class GenerateController(
             studentService.processStudentsExcelFile(studentsExcelFile)
             scheduleService.processScheduleJsonFile(scheduleJsonFile)
 
-            //val allTables = tableService.createAttendanceSheetsForAllStreams()
+            val allTables = tableService.createAttendanceSheetsForAllStreams()
 
-            val result: Map<String, List<String>> = emptyMap()
-
-//            val result = allTables.mapValues { entry ->
-//                entry.value.takeIf { it.isNotEmpty() } ?: listOf("No link generated")
-//            }
+            val result = allTables.mapValues { entry ->
+                entry.value.takeIf { it.isNotEmpty() } ?: listOf("No link generated")
+            }
 
             ResponseEntity.ok(result)
         } catch (e: Exception) {

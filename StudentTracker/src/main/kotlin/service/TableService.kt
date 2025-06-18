@@ -21,7 +21,6 @@ import org.springframework.stereotype.Service
 import java.time.LocalDateTime
 
 @Service
-@CacheConfig(cacheNames = ["studentsCache"])
 class TableService(
     @Value("\${google.credentials.path}")
     private val credentialsResource: Resource,
@@ -110,9 +109,8 @@ class TableService(
                     val spreadsheetId = createNewSpreadsheet(subject, stream, groupsInStream, studentsMap)
                     val url = "$BASE_SHEETS_URL$spreadsheetId"
 
-                    val teacherName =
-                        schedulesMap[groupsInStream.first()]?.first { it.subject == subject }?.teacher?.fullName
-                            ?: "Неизвестный преподаватель"
+                    val teacherName = schedulesMap[groupsInStream.first()]?.first { it.subject == subject }?.teacher?.fullName
+                        ?: "Неизвестный преподаватель"
 
                     saveTableLink(stream, subject, teacherName, url)
                     result[spreadsheetName] = listOf(url)
@@ -139,9 +137,17 @@ class TableService(
     ): String {
         logger.debug("Creating new spreadsheet for subject $subject and stream $stream")
 
-        val teacherEmails = groups.flatMap { group ->
-            scheduleRepository.findByGroupName(group).map { it.teacher.email }
-        }.toSet()
+        val emailsToShare = mutableSetOf<String?>()
+
+        groups.flatMap { group ->
+            scheduleRepository.findByGroupName(group)
+                .filter { it.subject == subject }
+                .mapNotNull { it.teacher.email }
+        }.forEach { emailsToShare.add(it) }
+
+        groups.mapNotNull { group ->
+            groupStreamRepository.findByGroupName(group)?.headman?.email
+        }.forEach { emailsToShare.add(it) }
 
         val spreadsheet = Spreadsheet()
             .setProperties(SpreadsheetProperties().setTitle("$subject$stream"))
@@ -151,7 +157,7 @@ class TableService(
         logger.debug("Created spreadsheet with ID: $spreadsheetId")
 
         try {
-            setSpreadsheetPermissions(spreadsheetId, teacherEmails)
+            setSpreadsheetPermissions(spreadsheetId, emailsToShare.filterNotNull().toSet())
             setupSpreadsheetSheets(spreadsheetId, groups, studentsMap)
             logger.debug("Successfully configured spreadsheet $spreadsheetId")
         } catch (e: Exception) {
@@ -277,26 +283,36 @@ class TableService(
             .also { logger.debug("Drive service initialized successfully") }
     }
 
-    private fun setSpreadsheetPermissions(spreadsheetId: String, teacherEmails: Set<String?>) {
+    private fun setSpreadsheetPermissions(spreadsheetId: String, emails: Set<String>) {
         logger.debug("Setting permissions for spreadsheet $spreadsheetId")
 
-        teacherEmails.forEach { email ->
+        emails.forEach { email ->
+            try {
+                if (email.isNotBlank()) {
+                    driveService.permissions().create(
+                        spreadsheetId,
+                        Permission()
+                            .setType("user")
+                            .setRole("writer")
+                            .setEmailAddress(email)
+                    ).execute()
+                }
+            } catch (e: Exception) {
+                logger.error("Failed to share spreadsheet with $email", e)
+            }
+        }
+
+        try {
             driveService.permissions().create(
                 spreadsheetId,
                 Permission()
-                    .setType("user")
-                    .setRole("writer")
-                    .setEmailAddress(email)
+                    .setType("anyone")
+                    .setRole("reader")
+                    .setAllowFileDiscovery(false)
             ).execute()
+        } catch (e: Exception) {
+            logger.error("Failed to set public read permissions", e)
         }
-
-        driveService.permissions().create(
-            spreadsheetId,
-            Permission()
-                .setType("anyone")
-                .setRole("reader")
-                .setAllowFileDiscovery(false)
-        ).execute()
     }
 
     private fun addNewSheetRequest(groupName: String, sheetId: Int): Request {

@@ -1,9 +1,6 @@
 package org.example.model
 
 import jakarta.persistence.*
-import org.apache.poi.ss.usermodel.Row
-import org.example.repository.GroupStreamRepository
-import org.example.repository.StudentRepository
 
 @Entity
 @Table(name = "students")
