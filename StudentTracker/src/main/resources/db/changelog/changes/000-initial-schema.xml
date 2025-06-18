@@ -6,51 +6,45 @@
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
 
     <changeSet id="1" author="alexey_pritula">
-
         <createTable tableName="group_streams">
-
             <column name="id" type="BIGINT" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
-
             <column name="group_name" type="text">
                 <constraints nullable="false" unique="true"/>
             </column>
-
             <column name="stream_name" type="text">
                 <constraints nullable="false"/>
             </column>
-
         </createTable>
 
         <createTable tableName="students">
-
             <column name="id" type="BIGINT" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
-
             <column name="surname" type="text">
                 <constraints nullable="false"/>
             </column>
-
             <column name="name" type="text">
                 <constraints nullable="false"/>
             </column>
-
             <column name="patronymic" type="text">
                 <constraints nullable="true"/>
             </column>
-
             <column name="email" type="text">
                 <constraints nullable="true"/>
             </column>
-
             <column name="group_stream_id" type="BIGINT">
-                <constraints nullable="false" foreignKeyName="fk_student_group_stream"
-                             referencedTableName="group_streams" referencedColumnNames="id"/>
+                <constraints nullable="false"/>
             </column>
-
         </createTable>
 
+        <addForeignKeyConstraint
+                baseTableName="students"
+                baseColumnNames="group_stream_id"
+                constraintName="fk_student_group_stream"
+                referencedTableName="group_streams"
+                referencedColumnNames="id"
+                onDelete="CASCADE"/>
     </changeSet>
 </databaseChangeLog>

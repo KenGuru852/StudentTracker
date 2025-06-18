@@ -2,6 +2,7 @@ package org.example.repository
 
 import org.example.model.GroupStream
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.stereotype.Repository
 
@@ -11,4 +12,8 @@ interface GroupStreamRepository : JpaRepository<GroupStream, Long> {
 
     @Query("SELECT gs FROM GroupStream gs")
     override fun findAll(): List<GroupStream>
+
+    @Modifying
+    @Query("UPDATE GroupStream gs SET gs.headman = NULL")
+    fun clearAllHeadmen()
 }

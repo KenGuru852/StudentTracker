@@ -21,14 +21,17 @@ class DatabaseService(
         return try {
             logger!!.info("Starting data cleanup process")
 
+            groupStreamRepository.clearAllHeadmen()
+            logger.info("Cleared headmen references")
+
+            scheduleRepository.deleteAllInBatch()
+            logger.info("Cleared schedule")
+
             tableLinkRepository.deleteAllInBatch()
             logger.info("Cleared table_links")
 
             studentRepository.deleteAllInBatch()
             logger.info("Cleared students")
-
-            scheduleRepository.deleteAllInBatch()
-            logger.info("Cleared schedule")
 
             teacherRepository.deleteAllInBatch()
             logger.info("Cleared teachers")
