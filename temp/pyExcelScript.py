@@ -30,9 +30,10 @@ def generate_english_email(last_name: str, first_name: str, middle_name: str) ->
         fake_en = Faker()
         return fake_en.email()
 
-# Группы, которые нужно создать
+# Группы для потоков ИП-0** и ИП-1**
 groups = (
-    [f"ИП-11{i}" for i in range(1, 8)] # ИП-111, ИП-112, ..., ИП-117
+    [f"ИП-01{i}" for i in range(1, 8)] +  # ИП-011, ИП-012, ..., ИП-017 (ИП-0**)
+    [f"ИП-11{i}" for i in range(1, 8)]    # ИП-111, ИП-112, ..., ИП-117 (ИП-1**)
 )
 
 for group in groups:
@@ -40,7 +41,7 @@ for group in groups:
     ws = wb.create_sheet(title=group)
     
     # Заголовки
-    headers = ["№", "Фамилия", "Имя", "Отчество", "Поток", "Группа", "Email"]
+    headers = ["№", "Фамилия", "Имя", "Отчество", "Поток", "Группа", "Email", "СТ"]
     ws.append(headers)
     
     # Жирный шрифт для заголовков
@@ -48,16 +49,13 @@ for group in groups:
         cell.font = Font(bold=True)
     
     # Определяем поток по группе
-    if group.startswith("ИП-1"):
-        stream = "ИП-1**"
-    elif group.startswith("ИП-0"):
+    if group.startswith("ИП-0"):
         stream = "ИП-0**"
-    elif group.startswith("ИС-1"):
-        stream = "ИС-1**"
     else:
-        stream = "ИС-0**"
+        stream = "ИП-1**"
     
     # Генерация 20 студентов для группы
+    students_data = []
     for i in range(1, 21):
         gender = random.choice(['male', 'female'])
         last_name = fake.last_name_male() if gender == 'male' else fake.last_name_female()
@@ -67,16 +65,24 @@ for group in groups:
         # Генерация английского email
         email = generate_english_email(last_name, first_name, middle_name)
         
-        # Добавляем данные
-        ws.append([
+        students_data.append([
             i,
             last_name,
             first_name,
             middle_name,
             stream,  # Поток
-            group,    # Группа
-            email
+            group,   # Группа
+            email,
+            ""      # Пока пустое значение для СТ
         ])
+    
+    # Выбираем случайного студента для "+" в колонке СТ
+    lucky_student_index = random.randint(0, 19)
+    students_data[lucky_student_index][7] = "+"
+    
+    # Добавляем данные в таблицу
+    for student in students_data:
+        ws.append(student)
     
     # Автоматическое выравнивание ширины столбцов
     for column in ws.columns:
@@ -92,6 +98,6 @@ for group in groups:
         ws.column_dimensions[column_letter].width = adjusted_width
 
 # Сохраняем файл
-output_filename = "studentsExcel.xlsx"
+output_filename = "students_IP_groups.xlsx"
 wb.save(output_filename)
 print(f"Файл {output_filename} успешно создан!")

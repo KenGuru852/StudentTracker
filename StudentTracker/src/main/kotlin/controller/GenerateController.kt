@@ -1,10 +1,6 @@
 package org.example.controller
 
-import org.example.service.DatabaseService
-import org.example.service.ScheduleService
-import org.example.service.StudentService
-import org.example.service.TableService
-import org.example.service.TeacherService
+import org.example.service.*
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -34,11 +30,13 @@ class GenerateController(
             studentService.processStudentsExcelFile(studentsExcelFile)
             scheduleService.processScheduleJsonFile(scheduleJsonFile)
 
-            val allTables = tableService.createAttendanceSheetsForAllStreams()
+            //val allTables = tableService.createAttendanceSheetsForAllStreams()
 
-            val result = allTables.mapValues { entry ->
-                entry.value.takeIf { it.isNotEmpty() } ?: listOf("No link generated")
-            }
+            val result: Map<String, List<String>> = emptyMap()
+
+//            val result = allTables.mapValues { entry ->
+//                entry.value.takeIf { it.isNotEmpty() } ?: listOf("No link generated")
+//            }
 
             ResponseEntity.ok(result)
         } catch (e: Exception) {

@@ -1,7 +1,6 @@
 package org.example.model
 
 import jakarta.persistence.*
-import org.example.repository.TeacherRepository
 
 @Entity
 @Table(name = "teachers")
@@ -10,11 +9,11 @@ data class Teacher(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null,
 
-    @Column(nullable = false, unique = true)
+    @Column(name = "full_name", nullable = false)
     val fullName: String,
 
-    @Column(nullable = false, unique = true)
-    val email: String
+    @Column
+    val email: String? = null
 ) {
-    constructor() : this(null, "", "")
+    constructor() : this(null, "", null)
 }

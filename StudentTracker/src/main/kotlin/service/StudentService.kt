@@ -20,7 +20,7 @@ class StudentService(
 
     @Transactional
     fun processStudentsExcelFile(file: MultipartFile): List<Student> {
-        if (studentRepository.findAll().isNotEmpty()){
+        if (studentRepository.findAll().isNotEmpty()) {
             return studentRepository.findById(1).toList()
         }
 
@@ -29,60 +29,22 @@ class StudentService(
 
         try {
             val workbook = XSSFWorkbook(ByteArrayInputStream(file.bytes))
-            processExcelSheets(workbook, groupStreamCache, students)
-            studentRepository.saveAll(students)
+            for (sheetIndex in 0 until workbook.numberOfSheets) {
+                val sheet = workbook.getSheetAt(sheetIndex)
+                for (rowIndex in 1..sheet.lastRowNum) {
+                    val row: Row = sheet.getRow(rowIndex) ?: continue
+                    try {
+                        students.add(Student.fromExcelRow(row, groupStreamRepository, studentRepository, groupStreamCache))
+                    } catch (e: IllegalArgumentException) {
+                        throw ExcelProcessingException("Ошибка в строке ${rowIndex + 1}: ${e.message}", e)
+                    }
+                }
+            }
         } catch (e: Exception) {
-            throw ExcelProcessingException("Ошибка обработки Excel файла", e)
+            throw ExcelProcessingException("Ошибка обработки Excel файла: ${e.message}", e)
         }
 
         return students
-    }
-
-    private fun processExcelSheets(
-        workbook: XSSFWorkbook,
-        groupStreamCache: MutableMap<String, GroupStream>,
-        students: MutableList<Student>
-    ) {
-        for (sheetIndex in 0 until workbook.numberOfSheets) {
-            val sheet = workbook.getSheetAt(sheetIndex)
-            for (rowIndex in 1..sheet.lastRowNum) {
-                val row: Row = sheet.getRow(rowIndex) ?: continue
-                processStudentRow(row, groupStreamCache, students)
-            }
-        }
-    }
-
-    private fun processStudentRow(
-        row: Row,
-        groupStreamCache: MutableMap<String, GroupStream>,
-        students: MutableList<Student>
-    ) {
-        val surname = row.getCell(1)?.toString()?.trim() ?: return
-        val name = row.getCell(2)?.toString()?.trim() ?: return
-        val patronymic = row.getCell(3)?.toString()?.trim()
-        val stream = row.getCell(4)?.toString()?.trim() ?: return
-        val group = row.getCell(5)?.toString()?.trim() ?: return
-        val email = row.getCell(6)?.toString()?.trim() ?: return
-
-        val groupStreamKey = "$group-$stream"
-        val groupStream = groupStreamCache.getOrPut(groupStreamKey) {
-            groupStreamRepository.findByGroupName(group) ?: groupStreamRepository.save(
-                GroupStream(
-                    groupName = group,
-                    streamName = stream
-                )
-            )
-        }
-
-        students.add(
-            Student(
-                surname = surname,
-                name = name,
-                patronymic = patronymic,
-                email = email,
-                groupStream = groupStream
-            )
-        )
     }
 }
 

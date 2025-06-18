@@ -277,7 +277,7 @@ class TableService(
             .also { logger.debug("Drive service initialized successfully") }
     }
 
-    private fun setSpreadsheetPermissions(spreadsheetId: String, teacherEmails: Set<String>) {
+    private fun setSpreadsheetPermissions(spreadsheetId: String, teacherEmails: Set<String?>) {
         logger.debug("Setting permissions for spreadsheet $spreadsheetId")
 
         teacherEmails.forEach { email ->

@@ -3,10 +3,18 @@ body {
     max-width: 800px;
     margin: 0 auto;
     padding: 20px;
+    line-height: 1.6;
+}
+
+h1, h2, h3 {
+    color: #2c3e50;
 }
 
 .file-inputs {
     margin-bottom: 20px;
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
 }
 
 .file-input {
@@ -17,6 +25,20 @@ body {
     display: block;
     margin-bottom: 5px;
     font-weight: bold;
+    color: #495057;
+}
+
+.file-hint {
+    font-size: 0.8em;
+    color: #6c757d;
+    margin-top: 0.2em;
+    font-style: italic;
+}
+
+.buttons {
+    margin: 20px 0;
+    display: flex;
+    gap: 10px;
 }
 
 button {
@@ -43,14 +65,12 @@ button:hover {
     white-space: pre-wrap;
 }
 
-/* Объединённый блок .filters */
 .filters {
     margin-top: 20px;
     padding: 15px;
     border: 1px solid #ddd;
     border-radius: 5px;
     background-color: #f9f9f9;
-    display: block; /* Явно указываем, что блок должен отображаться */
 }
 
 .filter {
@@ -61,6 +81,7 @@ button:hover {
     display: block;
     margin-bottom: 5px;
     font-weight: bold;
+    color: #495057;
 }
 
 .filter input[type="text"] {
@@ -69,6 +90,7 @@ button:hover {
     border: 1px solid #ddd;
     border-radius: 4px;
     font-size: 16px;
+    box-sizing: border-box;
 }
 
 #filteredResults {
@@ -81,19 +103,36 @@ button:hover {
 
 .table-link {
     display: block;
-    margin: 5px 0;
-    padding: 8px;
+    margin: 10px 0;
+    padding: 12px;
     background-color: #e9f7ef;
     border-radius: 4px;
     color: #2e7d32;
     text-decoration: none;
+    transition: background-color 0.3s;
 }
 
 .table-link:hover {
     background-color: #d4edda;
 }
 
-/* Стиль для кнопки "Применить фильтры" */
+.table-link strong {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 1.1em;
+}
+
+.table-link span {
+    display: block;
+    margin-bottom: 5px;
+    color: #495057;
+}
+
+.table-link a {
+    color: #1e88e5;
+    word-break: break-all;
+}
+
 #applyFiltersBtn {
     margin-top: 10px;
     background-color: #2196F3;
@@ -105,7 +144,6 @@ button:hover {
 
 .danger-btn {
     background-color: #f44336;
-    margin-left: 10px;
 }
 
 .danger-btn:hover {
@@ -118,17 +156,26 @@ button:hover {
     left: 50%;
     transform: translate(-50%, -50%);
     background: white;
-    padding: 20px;
+    padding: 25px;
     border-radius: 5px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    box-shadow: 0 0 20px rgba(0,0,0,0.2);
     z-index: 1000;
+    width: 400px;
+    max-width: 90%;
+}
+
+.confirmation-dialog h3 {
+    margin-top: 0;
+    color: #d32f2f;
 }
 
 .confirmation-dialog p {
-    margin-bottom: 15px;
+    margin-bottom: 20px;
+    line-height: 1.5;
 }
 
 .confirmation-dialog button {
+    padding: 8px 15px;
     margin-right: 10px;
 }
 
@@ -138,6 +185,15 @@ button:hover {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(255,0,0,0.5);
+    background: rgba(0,0,0,0.5);
     z-index: 999;
+}
+
+.error-message {
+    color: #d32f2f;
+    background-color: #fde8e8;
+    padding: 10px;
+    border-radius: 4px;
+    margin-top: 10px;
+    border-left: 4px solid #d32f2f;
 }

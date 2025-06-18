@@ -13,7 +13,7 @@ def filter_ip_is_groups(input_file, output_file):
         # Фильтрация данных (предполагаем, что это список объектов)
         filtered_data = [item for item in data 
                         if isinstance(item.get("Группа"), str) and 
-                        (item["Группа"].startswith("ИП-1") )]
+                        (item["Группа"].startswith("ИП-0") )]
         
         # Сохранение отфильтрованных данных в новый файл
         with open(output_file, 'w', encoding='utf-8') as f:
@@ -26,6 +26,6 @@ def filter_ip_is_groups(input_file, output_file):
 
 # Укажите пути к вашему файлу и выходному файлу
 input_json = 'fullSchedule.json'  # Замените на ваш файл
-output_json = 'demoSchedule.json'  # Выходной файл
+output_json = 'schedule_IP0.json'  # Выходной файл
 
 filter_ip_is_groups(input_json, output_json)

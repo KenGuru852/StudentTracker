@@ -6,10 +6,6 @@
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
 
     <changeSet id="4" author="alexey_pritula">
-        <dropUniqueConstraint
-                tableName="students"
-                constraintName="students_email_key"/>
-
         <createTable tableName="teachers">
             <column name="id" type="BIGINT" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false"/>
@@ -20,7 +16,7 @@
             </column>
 
             <column name="email" type="text">
-                <constraints nullable="false"/>
+                <constraints nullable="true"/>
             </column>
         </createTable>
     </changeSet>

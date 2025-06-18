@@ -15,26 +15,17 @@ class ScheduleService(
     private val scheduleRepository: ScheduleRepository,
     private val teacherRepository: TeacherRepository
 ) {
-    private val objectMapper = jacksonObjectMapper()
-
     @Transactional
     fun processScheduleJsonFile(file: MultipartFile): List<Schedule> {
         if (scheduleRepository.findAll().isNotEmpty()) {
             return scheduleRepository.findById(1).toList()
         }
 
-        val jsonString = String(file.bytes)
-        val schedules = parseSchedulesFromJson(jsonString)
-
-        return scheduleRepository.saveAll(schedules)
-    }
-
-    private fun parseSchedulesFromJson(jsonString: String): List<Schedule> {
         return try {
-            val jsonList: List<Map<String, Any>> = objectMapper.readValue(jsonString)
-            jsonList.map { Schedule.fromJson(it, teacherRepository) }
+            val jsonList: List<Map<String, Any>> = jacksonObjectMapper().readValue(String(file.bytes))
+            scheduleRepository.saveAll(jsonList.map { Schedule.fromJson(it, teacherRepository) })
         } catch (e: Exception) {
-            throw ScheduleProcessingException("Ошибка парсинга JSON: ${e.message}", e)
+            throw ScheduleProcessingException("Ошибка обработки файла расписания: ${e.message}", e)
         }
     }
 }

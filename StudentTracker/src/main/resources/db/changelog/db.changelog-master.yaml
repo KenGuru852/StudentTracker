@@ -7,3 +7,5 @@ databaseChangeLog:
       file: db/changelog/changes/003-create-links.xml
   - include:
       file: db/changelog/changes/004-create-teachers.xml
+  - include:
+      file: db/changelog/changes/005-alter-group-stream.xml

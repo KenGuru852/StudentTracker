@@ -30,10 +30,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(error || `Ошибка сервера: ${response.status}`);
             }
 
-            resultDiv.textContent = 'Все данные успешно очищены!';
+            resultDiv.innerHTML = '<div class="success-message">Все данные успешно очищены!</div>';
             displayFilteredTables();
         } catch (error) {
-            resultDiv.textContent = `Ошибка: ${error.message}`;
+            resultDiv.innerHTML = `<div class="error-message">Ошибка: ${error.message}</div>`;
             console.error('Ошибка при очистке данных:', error);
         }
     });
@@ -44,7 +44,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const teachersFile = teachersFileInput.files[0];
         
         if (!scheduleFile || !studentFile || !teachersFile) {
-            resultDiv.textContent = 'Пожалуйста, выберите все три файла';
+            resultDiv.innerHTML = '<div class="error-message">Пожалуйста, выберите все три файла</div>';
+            return;
+        }
+
+        const isScheduleValid = scheduleFile.name.endsWith('.json') && 
+                              scheduleFile.type === 'application/json';
+        const isStudentValid = studentFile.name.match(/\.(xlsx|xls)$/i) && 
+                             (studentFile.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+                              studentFile.type === 'application/vnd.ms-excel');
+        const isTeachersValid = teachersFile.name.endsWith('.json') && 
+                              teachersFile.type === 'application/json';
+
+        if (!isScheduleValid || !isStudentValid || !isTeachersValid) {
+            let errorMessage = 'Неверные форматы файлов:';
+            if (!isScheduleValid) errorMessage += '<br>- Расписание должно быть в формате JSON';
+            if (!isStudentValid) errorMessage += '<br>- База студентов должна быть в формате Excel (XLSX/XLS)';
+            if (!isTeachersValid) errorMessage += '<br>- База преподавателей должна быть в формате JSON';
+            
+            resultDiv.innerHTML = `<div class="error-message">${errorMessage}</div>`;
             return;
         }
 
@@ -66,10 +84,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const result = await response.json();
-            resultDiv.textContent = 'Таблицы успешно сгенерированы!';
+            resultDiv.innerHTML = '<div class="success-message">Таблицы успешно сгенерированы!</div>';
             displayFilteredTables();
         } catch (error) {
-            resultDiv.textContent = `Ошибка: ${error.message}`;
+            resultDiv.innerHTML = `<div class="error-message">Ошибка: ${error.message}</div>`;
             console.error('Ошибка при отправке файлов:', error);
         }
     });
@@ -84,8 +102,10 @@ document.addEventListener('DOMContentLoaded', () => {
             dialog.innerHTML = `
                 <h3>${title}</h3>
                 <p>${message}</p>
-                <button id="confirmYes">Да, очистить</button>
-                <button id="confirmNo">Отмена</button>
+                <div class="dialog-buttons">
+                    <button id="confirmYes" class="danger-btn">Да, очистить</button>
+                    <button id="confirmNo">Отмена</button>
+                </div>
             `;
             
             document.body.appendChild(overlay);
@@ -106,37 +126,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function displayFilteredTables() {
-    const streamFilterValue = streamFilter.value.trim();
-    const subjectFilterValue = subjectFilter.value.trim();
-    const teacherFilterValue = teacherFilter.value.trim();
+        const streamFilterValue = streamFilter.value.trim();
+        const subjectFilterValue = subjectFilter.value.trim();
+        const teacherFilterValue = teacherFilter.value.trim();
 
-    filteredResultsDiv.innerHTML = 'Загрузка...';
-    
-    try {
-        const params = new URLSearchParams();
-        if (streamFilterValue) params.append('stream', streamFilterValue);
-        if (subjectFilterValue) params.append('subject', subjectFilterValue);
-        if (teacherFilterValue) params.append('teacher', teacherFilterValue);
+        filteredResultsDiv.innerHTML = '<p>Загрузка данных...</p>';
+        
+        try {
+            const params = new URLSearchParams();
+            if (streamFilterValue) params.append('stream', streamFilterValue);
+            if (subjectFilterValue) params.append('subject', subjectFilterValue);
+            if (teacherFilterValue) params.append('teacher', teacherFilterValue);
 
-        const response = await fetch(`/api/getFilteredLinks?${params.toString()}`);
-        
-        if (!response.ok) throw new Error('Ошибка загрузки таблиц');
-        
-        const links = await response.json();
-        filteredResultsDiv.innerHTML = links.length === 0 
-            ? 'Нет таблиц, соответствующих фильтрам' 
-            : links.map(link => `
-                <div class="table-link">
-                    <strong>${link.stream} - ${link.subject}</strong><br>
-                    <span>Преподаватель: ${link.teacher}</span><br>
-                    <a href="${link.link}" target="_blank">${link.link}</a>
-                </div>
-            `).join('');
-    } catch (error) {
-        filteredResultsDiv.innerHTML = `Ошибка: ${error.message}`;
-        console.error('Ошибка:', error);
+            const response = await fetch(`/api/getFilteredLinks?${params.toString()}`);
+            
+            if (!response.ok) throw new Error('Ошибка загрузки таблиц');
+            
+            const links = await response.json();
+            filteredResultsDiv.innerHTML = links.length === 0 
+                ? '<p>Нет таблиц, соответствующих фильтрам</p>' 
+                : links.map(link => `
+                    <div class="table-link">
+                        <strong>${link.stream} - ${link.subject}</strong>
+                        <span>Преподаватель: ${link.teacher}</span>
+                        <a href="${link.link}" target="_blank">Открыть таблицу</a>
+                    </div>
+                `).join('');
+        } catch (error) {
+            filteredResultsDiv.innerHTML = `<div class="error-message">Ошибка: ${error.message}</div>`;
+            console.error('Ошибка:', error);
+        }
     }
-}
 
     function debounce(func, timeout = 500) {
         let timer;

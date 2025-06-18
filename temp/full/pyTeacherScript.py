@@ -45,6 +45,6 @@ def extract_teachers(input_file, output_file):
         print(f"Произошла ошибка: {str(e)}")
 
 # Использование функции
-input_json = "demoSchedule.json"  # Имя входного файла
-output_json = "demoTeachers.json"  # Имя выходного файла
+input_json = "fullSchedule.json"  # Имя входного файла
+output_json = "fullTeacher.json"  # Имя выходного файла
 extract_teachers(input_json, output_json)

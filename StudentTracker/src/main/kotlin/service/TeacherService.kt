@@ -12,35 +12,31 @@ import org.springframework.web.multipart.MultipartFile
 class TeacherService(
     private val teacherRepository: TeacherRepository
 ) {
-    private val objectMapper = jacksonObjectMapper()
 
     @Transactional
     fun processTeachersJsonFile(file: MultipartFile): Int {
         val jsonString = String(file.bytes)
-        val teachers = parseTeachersFromJson(jsonString)
 
-        val existingEmails = teacherRepository.findAll().map { it.email }.toSet()
-        val newTeachers = teachers.filter { !existingEmails.contains(it.email) }
+        val teachers = try {
+            val jsonList: List<Map<String, String>> = jacksonObjectMapper().readValue(jsonString)
+            jsonList.map {
+                Teacher(
+                    fullName = it["full_name"] ?: throw IllegalArgumentException("Отсутствует full_name"),
+                    email = it["email"]
+                )
+            }
+        } catch (e: Exception) {
+            throw TeacherProcessingException("Ошибка парсинга JSON преподавателей: ${e.message}", e)
+        }
+
+        val existingTeachers = teacherRepository.findAll().map { it.fullName }.toSet()
+        val newTeachers = teachers.filter { !existingTeachers.contains(it.fullName) }
 
         if (newTeachers.isNotEmpty()) {
             teacherRepository.saveAll(newTeachers)
         }
 
         return newTeachers.size
-    }
-
-    private fun parseTeachersFromJson(jsonString: String): List<Teacher> {
-        return try {
-            val jsonList: List<Map<String, String>> = objectMapper.readValue(jsonString)
-            jsonList.map {
-                Teacher(
-                    fullName = it["full_name"] ?: throw IllegalArgumentException("Отсутствует full_name"),
-                    email = it["email"] ?: throw IllegalArgumentException("Отсутствует email")
-                )
-            }
-        } catch (e: Exception) {
-            throw TeacherProcessingException("Ошибка парсинга JSON преподавателей: ${e.message}", e)
-        }
     }
 }
 

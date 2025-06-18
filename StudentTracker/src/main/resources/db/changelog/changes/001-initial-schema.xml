@@ -42,7 +42,7 @@
             </column>
 
             <column name="email" type="text">
-                <constraints nullable="false" unique="true"/>
+                <constraints nullable="true"/>
             </column>
 
             <column name="group_stream_id" type="BIGINT">

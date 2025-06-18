@@ -13,7 +13,7 @@ const BACKEND_URL = 'http://backend:8080';
 
 app.use(cors());
 app.use(fileUpload({
-  limits: { fileSize: 10 * 1024 * 1024 * 1024 }, 
+  limits: { fileSize: 10 * 1024 * 1024 * 1024 },
   abortOnLimit: true
 }));
 
@@ -31,7 +31,7 @@ app.get('/api/getFilteredLinks', async (req, res) => {
         const params = new URLSearchParams();
         if (stream) params.append('stream', stream);
         if (subject) params.append('subject', subject);
-        if (teacher) params.append('teacher', teacher)
+        if (teacher) params.append('teacher', teacher);
 
         const response = await fetch(`${BACKEND_URL}/api/getFilteredLinks?${params}`);
         
@@ -70,24 +70,45 @@ app.post('/api/generateTables', async (req, res) => {
             return res.status(400).send('Необходимо загрузить все три файла');
         }
 
+        const scheduleFile = req.files.scheduleFile;
+        const studentFile = req.files.studentFile;
+        const teachersFile = req.files.teachersFile;
+
+        const isScheduleValid = scheduleFile.name.endsWith('.json') && 
+                              scheduleFile.mimetype === 'application/json';
+        const isStudentValid = studentFile.name.match(/\.(xlsx|xls)$/i) && 
+                             (studentFile.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+                              studentFile.mimetype === 'application/vnd.ms-excel');
+        const isTeachersValid = teachersFile.name.endsWith('.json') && 
+                              teachersFile.mimetype === 'application/json';
+
+        if (!isScheduleValid || !isStudentValid || !isTeachersValid) {
+            let errorMessage = 'Неверные форматы файлов:';
+            if (!isScheduleValid) errorMessage += '\n- Расписание должно быть в формате JSON';
+            if (!isStudentValid) errorMessage += '\n- База студентов должна быть в формате Excel (XLSX/XLS)';
+            if (!isTeachersValid) errorMessage += '\n- База преподавателей должна быть в формате JSON';
+            
+            return res.status(400).send(errorMessage);
+        }
+
         const formData = new FormData();
-        formData.append('scheduleFile', req.files.scheduleFile.data, {
-            filename: req.files.scheduleFile.name,
-            contentType: req.files.scheduleFile.mimetype
+        formData.append('scheduleFile', scheduleFile.data, {
+            filename: scheduleFile.name,
+            contentType: scheduleFile.mimetype
         });
-        formData.append('studentFile', req.files.studentFile.data, {
-            filename: req.files.studentFile.name,
-            contentType: req.files.studentFile.mimetype
+        formData.append('studentFile', studentFile.data, {
+            filename: studentFile.name,
+            contentType: studentFile.mimetype
         });
-        formData.append('teachersFile', req.files.teachersFile.data, {
-            filename: req.files.teachersFile.name,
-            contentType: req.files.teachersFile.mimetype
+        formData.append('teachersFile', teachersFile.data, {
+            filename: teachersFile.name,
+            contentType: teachersFile.mimetype
         });
 
         const response = await fetch(`${BACKEND_URL}/api/generateTables`, {
             method: 'POST',
             body: formData,
-            headers: formData.getHeaders() 
+            headers: formData.getHeaders()
         });
 
         res.status(response.status).json(await response.json());
