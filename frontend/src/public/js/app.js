@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clearDataBtn.addEventListener('click', async () => {
         const confirmed = await showConfirmationDialog(
             'Вы уверены, что хотите очистить все данные?',
-            'Это действие удалит все таблицы, студентов, группы и расписание. Отменить это действие будет невозможно.'
+            'Это действие удалит ВСЕ данные из ВСЕХ таблиц. Отменить это действие будет невозможно.'
         );
         
         if (!confirmed) return;
